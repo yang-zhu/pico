@@ -1,10 +1,10 @@
-module PrivateMVar where
+module GlobalMVar where
 
 import Control.Concurrent.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
 import Control.Concurrent (forkIO)
 
 
-newtype Channel a = Chan (MVar (a, MVar ()))
+data Channel a = Chan (MVar a) (MVar ()) (MVar ())
 newtype Process = Proc (MVar () -> IO ())
 
 
@@ -28,21 +28,24 @@ repl (Proc p) = Proc $ \stop -> let p' = forkIO (p stop) >> p' in p'
 
 new :: (Channel a -> Process) -> Process 
 new p = Proc $ \stop -> do
-  chan <- newEmptyMVar
-  let Proc p' = p (Chan chan)
+  cont <- newEmptyMVar
+  check1 <- newEmptyMVar
+  check2 <- newEmptyMVar
+  let Proc p' = p (Chan cont check1 check2)
   p' stop
 
 output :: Channel a -> a -> Process -> Process
-output (Chan chan) msg (Proc p) = Proc $ \stop -> do
-  checkChan <- newMVar ()
-  putMVar chan (msg, checkChan)
-  putMVar checkChan ()
+output (Chan cont check1 check2) msg (Proc p) = Proc $ \stop -> do
+  putMVar check1 ()
+  putMVar cont msg
+  takeMVar check2
+  takeMVar check1
   p stop
 
 input :: Channel a -> (a -> Process) -> Process
-input (Chan chan) p = Proc $ \stop -> do
-  (msg, checkChan) <- takeMVar chan
-  takeMVar checkChan
+input (Chan cont check1 check2) p = Proc $ \stop -> do
+  msg <- takeMVar cont
+  putMVar check2 ()
   let Proc p' = p msg
   p' stop
 

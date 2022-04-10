@@ -1,6 +1,7 @@
 module Main where
 
-import PrivateMVar
+-- import PrivateMVar
+import GlobalMVar
 
 main :: IO ()
 main = do
