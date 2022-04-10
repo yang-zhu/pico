@@ -31,6 +31,8 @@ library
       Paths_pi
   hs-source-dirs:
       src
+  default-extensions:
+      BlockArguments
   build-depends:
       base >=4.7 && <5
   default-language: Haskell2010
@@ -41,6 +43,8 @@ executable pi-exe
       Paths_pi
   hs-source-dirs:
       app
+  default-extensions:
+      BlockArguments
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
@@ -54,6 +58,8 @@ test-suite pi-test
       Paths_pi
   hs-source-dirs:
       test
+  default-extensions:
+      BlockArguments
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5

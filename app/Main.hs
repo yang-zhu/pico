@@ -1,15 +1,17 @@
 module Main where
 
--- import PrivateMVar
-import GlobalMVar
+import Control.Concurrent (threadDelay)
+import PrivateMVar
+-- import GlobalMVar
 
 main :: IO ()
 main = do
   runProcess $ 
-    new $ \x -> 
-      output x z (exec act1 inert) `par` input x (\y -> exec (act2 y) stop)
+    new $ \chan ->
+      keepSendingMsgs chan z `par` (repl $ input chan (\y -> exec (act2 y) inert))
   where
     z :: Int
     z = 5
+    keepSendingMsgs chan msg = output chan msg (exec (act1 >> threadDelay 1000000) (keepSendingMsgs chan msg)) 
     act1 = putStrLn "message sent"
     act2 y = putStrLn $ "message received: " ++ show y 

@@ -25,6 +25,9 @@ dependencies:
 library:
   source-dirs: src
 
+default-extensions:
+  BlockArguments
+
 executables:
   pi-exe:
     main:                Main.hs
