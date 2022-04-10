@@ -37,7 +37,7 @@ library
       base >=4.7 && <5
   default-language: Haskell2010
 
-executable pi-exe
+executable picaco-exe
   main-is: Main.hs
   other-modules:
       Paths_picaco
@@ -51,7 +51,7 @@ executable pi-exe
     , picaco
   default-language: Haskell2010
 
-test-suite pi-test
+test-suite picaco-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:

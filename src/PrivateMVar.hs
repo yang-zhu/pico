@@ -6,7 +6,7 @@ import Control.Monad (forever)
 
 
 newtype Channel a = Chan (MVar (a, MVar ()))
-newtype Process = Proc ((MVar (), MVar Bool) -> IO ())
+newtype Process = Proc ((MVar (), MVar ()) -> IO ())
 
 
 runProcess :: Process -> IO ()
@@ -25,13 +25,15 @@ inert = Proc \_ -> return ()
 par :: Process -> Process -> Process
 par (Proc p) (Proc q) = Proc \env -> forkIO (q env) >> p env
 
+-- process p is only replicated when it has been reduced
 repl :: Process -> Process
 repl (Proc p) = Proc \(stop, _) ->
   forever do
-    hasReduced <- newEmptyMVar
-    forkIO (p (stop, hasReduced))
-    takeMVar hasReduced
+    pReduced <- newEmptyMVar
+    forkIO (p (stop, pReduced))
+    takeMVar pReduced
 
+-- process p is immediately replicated infinitely often
 alwaysRepl :: Process -> Process
 alwaysRepl (Proc p) = Proc \env -> forever $ forkIO (p env)
 
@@ -46,14 +48,14 @@ output (Chan chan) msg (Proc p) = Proc \env@(_, reduced) -> do
   checkChan <- newMVar ()
   putMVar chan (msg, checkChan)
   putMVar checkChan ()
-  tryPutMVar reduced True
+  tryPutMVar reduced ()
   p env
 
 input :: Channel a -> (a -> Process) -> Process
 input (Chan chan) p = Proc \env@(_, reduced) -> do
   (msg, checkChan) <- takeMVar chan
   takeMVar checkChan
-  tryPutMVar reduced True
+  tryPutMVar reduced ()
   let Proc p' = p msg
   p' env
 
