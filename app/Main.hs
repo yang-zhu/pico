@@ -1,8 +1,8 @@
 module Main where
 
 import Control.Concurrent (threadDelay)
-import PrivateMVar
--- import GlobalMVar
+-- import PrivateMVar
+import GlobalMVar
 
 main :: IO ()
 main = do

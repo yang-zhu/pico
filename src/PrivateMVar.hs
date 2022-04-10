@@ -32,6 +32,9 @@ repl (Proc p) = Proc \(stop, _) ->
     forkIO (p (stop, hasReduced))
     takeMVar hasReduced
 
+alwaysRepl :: Process -> Process
+alwaysRepl (Proc p) = Proc \env -> forever $ forkIO (p env)
+
 new :: (Channel a -> Process) -> Process 
 new p = Proc \env -> do
   chan <- newEmptyMVar
