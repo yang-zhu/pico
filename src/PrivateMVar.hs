@@ -43,16 +43,16 @@ new p = Proc \env -> do
   let Proc p' = p (Chan chan)
   p' env
 
-output :: Channel a -> a -> Process -> Process
-output (Chan chan) msg (Proc p) = Proc \env@(_, reduced) -> do
+send :: Channel a -> a -> Process -> Process
+send (Chan chan) msg (Proc p) = Proc \env@(_, reduced) -> do
   checkChan <- newMVar ()
   putMVar chan (msg, checkChan)
   putMVar checkChan ()
   tryPutMVar reduced ()
   p env
 
-input :: Channel a -> (a -> Process) -> Process
-input (Chan chan) p = Proc \env@(_, reduced) -> do
+recv :: Channel a -> (a -> Process) -> Process
+recv (Chan chan) p = Proc \env@(_, reduced) -> do
   (msg, checkChan) <- takeMVar chan
   takeMVar checkChan
   tryPutMVar reduced ()

@@ -26,15 +26,20 @@ source-repository head
 library
   exposed-modules:
       GlobalMVar
+      GlobalTMVar
       PrivateMVar
+      PrivateTMVar
   other-modules:
       Paths_pico
   hs-source-dirs:
       src
   default-extensions:
       BlockArguments
+      LambdaCase
+      NamedFieldPuns
   build-depends:
       base >=4.7 && <5
+    , stm
   default-language: Haskell2010
 
 executable pico-exe
@@ -45,10 +50,13 @@ executable pico-exe
       app
   default-extensions:
       BlockArguments
+      LambdaCase
+      NamedFieldPuns
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , pico
+    , stm
   default-language: Haskell2010
 
 test-suite pico-test
@@ -60,8 +68,11 @@ test-suite pico-test
       test
   default-extensions:
       BlockArguments
+      LambdaCase
+      NamedFieldPuns
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , pico
+    , stm
   default-language: Haskell2010

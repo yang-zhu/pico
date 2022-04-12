@@ -45,8 +45,8 @@ new p = Proc \env -> do
   let Proc p' = p (Chan cont check1 check2)
   p' env
 
-output :: Channel a -> a -> Process -> Process
-output (Chan cont check1 check2) msg (Proc p) = Proc \env@(_, reduced) -> do
+send :: Channel a -> a -> Process -> Process
+send (Chan cont check1 check2) msg (Proc p) = Proc \env@(_, reduced) -> do
   putMVar check1 ()
   putMVar cont msg
   takeMVar check2
@@ -54,8 +54,8 @@ output (Chan cont check1 check2) msg (Proc p) = Proc \env@(_, reduced) -> do
   tryPutMVar reduced ()
   p env
 
-input :: Channel a -> (a -> Process) -> Process
-input (Chan cont check1 check2) p = Proc \env@(_, reduced) -> do
+recv :: Channel a -> (a -> Process) -> Process
+recv (Chan cont _ check2) p = Proc \env@(_, reduced) -> do
   msg <- takeMVar cont
   putMVar check2 ()
   tryPutMVar reduced ()
