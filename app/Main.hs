@@ -1,10 +1,13 @@
 module Main where
 
 import Control.Concurrent (threadDelay)
+import Process
+import Channel
 -- import PrivateMVar
 -- import GlobalMVar
-import PrivateTMVar
+-- import PrivateTMVar
 -- import GlobalTMVar
+import Async
 
 main :: IO ()
 main = do
@@ -19,7 +22,7 @@ main = do
     --     choose x (\ch -> exec (putStrLn $ "message received on " ++ ch) stop)
     --             y (\ch -> exec (putStrLn $ "message received on " ++ ch) stop)
 
-    newAsync \chan ->
+    new \chan ->
       asyncMultiSend chan 10 `par` asyncMultiRecv chan 5
   
   where
@@ -32,9 +35,9 @@ main = do
     asyncMultiSend :: AsyncChannel String -> Int -> Process
     asyncMultiSend chan counter
       | counter == 0 = inert
-      | otherwise = sendAsync chan (show counter) (exec (putStrLn $ show counter ++ " sent") (asyncMultiSend chan (counter-1)))
+      | otherwise = send chan (show counter) (exec (putStrLn $ show counter ++ " sent") (asyncMultiSend chan (counter-1)))
 
     asyncMultiRecv :: AsyncChannel String -> Int -> Process
     asyncMultiRecv chan counter
       | counter == 0 = inert
-      | otherwise = recvAsync chan (\msg -> exec (putStrLn $ msg ++ " received") (asyncMultiRecv chan (counter-1)))
+      | otherwise = recv chan (\msg -> exec (putStrLn $ msg ++ " received") (asyncMultiRecv chan (counter-1)))

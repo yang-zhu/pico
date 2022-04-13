@@ -1,66 +1,34 @@
-module GlobalMVar where
+module GlobalMVar (SyncChannel) where
 
-import Control.Concurrent.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar, tryPutMVar)
-import Control.Concurrent (forkIO)
-import Control.Monad (forever)
-
-
-data Channel a = Chan (MVar a) (MVar ()) (MVar ())
-newtype Process = Proc ((MVar (), MVar ()) -> IO ())
+import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar, tryPutMVar)
+import Process (Process(..), Environment(..))
+import Channel (Channel(..))
 
 
-runProcess :: Process -> IO ()
-runProcess (Proc p) = do
-  stop <- newMVar ()
-  reduced <- newEmptyMVar
-  forkIO (p (stop, reduced))
-  putMVar stop ()
+data SyncChannel a = Chan (MVar a) (MVar ()) (MVar ())
 
-stop :: Process
-stop = Proc \(stop, _) -> takeMVar stop
+instance Channel SyncChannel where
+  new :: (SyncChannel a -> Process) -> Process 
+  new p = Proc \env -> do
+    cont <- newEmptyMVar
+    check1 <- newEmptyMVar
+    check2 <- newEmptyMVar
+    let Proc p' = p (Chan cont check1 check2)
+    p' env
 
-inert :: Process
-inert = Proc \_ -> return ()
+  send :: SyncChannel a -> a -> Process -> Process
+  send (Chan cont check1 check2) msg (Proc p) = Proc \env@Env{reduced} -> do
+    putMVar check1 ()
+    putMVar cont msg
+    takeMVar check2
+    takeMVar check1
+    tryPutMVar reduced ()
+    p env
 
-par :: Process -> Process -> Process
-par (Proc p) (Proc q) = Proc \env -> forkIO (q env) >> p env
-
--- process p is only replicated when it has been reduced
-repl :: Process -> Process
-repl (Proc p) = Proc \(stop, _) ->
-  forever do
-    pReduced <- newEmptyMVar
-    forkIO (p (stop, pReduced))
-    takeMVar pReduced
-
--- process p is immediately replicated infinitely often
-alwaysRepl :: Process -> Process
-alwaysRepl (Proc p) = Proc \env -> forever $ forkIO (p env)
-
-new :: (Channel a -> Process) -> Process 
-new p = Proc \env -> do
-  cont <- newEmptyMVar
-  check1 <- newEmptyMVar
-  check2 <- newEmptyMVar
-  let Proc p' = p (Chan cont check1 check2)
-  p' env
-
-send :: Channel a -> a -> Process -> Process
-send (Chan cont check1 check2) msg (Proc p) = Proc \env@(_, reduced) -> do
-  putMVar check1 ()
-  putMVar cont msg
-  takeMVar check2
-  takeMVar check1
-  tryPutMVar reduced ()
-  p env
-
-recv :: Channel a -> (a -> Process) -> Process
-recv (Chan cont _ check2) p = Proc \env@(_, reduced) -> do
-  msg <- takeMVar cont
-  putMVar check2 ()
-  tryPutMVar reduced ()
-  let Proc p' = p msg
-  p' env
-
-exec :: IO a -> Process -> Process
-exec act (Proc p) = Proc \env -> act >> p env
+  recv :: SyncChannel a -> (a -> Process) -> Process
+  recv (Chan cont _ check2) p = Proc \env@Env{reduced} -> do
+    msg <- takeMVar cont
+    putMVar check2 ()
+    tryPutMVar reduced ()
+    let Proc p' = p msg
+    p' env

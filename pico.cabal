@@ -12,7 +12,6 @@ bug-reports:    https://github.com/githubuser/pico/issues
 author:         Author name here
 maintainer:     example@example.com
 copyright:      2022 Author name here
-license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
@@ -25,10 +24,14 @@ source-repository head
 
 library
   exposed-modules:
+      Async
+      Channel
       GlobalMVar
       GlobalTMVar
       PrivateMVar
       PrivateTMVar
+      Process
+      Utils
   other-modules:
       Paths_pico
   hs-source-dirs:
@@ -37,6 +40,7 @@ library
       BlockArguments
       LambdaCase
       NamedFieldPuns
+      InstanceSigs
   build-depends:
       base >=4.7 && <5
     , stm
@@ -52,6 +56,7 @@ executable pico-exe
       BlockArguments
       LambdaCase
       NamedFieldPuns
+      InstanceSigs
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
@@ -70,6 +75,7 @@ test-suite pico-test
       BlockArguments
       LambdaCase
       NamedFieldPuns
+      InstanceSigs
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
