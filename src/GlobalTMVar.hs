@@ -1,4 +1,4 @@
-module GlobalTMVar (SyncChannel) where
+module GlobalTMVar (SyncChannel, new) where
 
 import Data.Functor ((<&>))
 import Control.Concurrent.MVar (tryPutMVar)
@@ -15,14 +15,6 @@ data SyncChannel a = Chan
   }
 
 instance Channel SyncChannel where
-  new :: (SyncChannel a -> Process) -> Process 
-  new p = Proc \env -> do
-    cont <- newEmptyTMVarIO
-    check1 <- newEmptyTMVarIO
-    check2 <- newEmptyTMVarIO
-    let Proc p' = p (Chan cont check1 check2)
-    p' env
-
   send :: SyncChannel a -> a -> Process -> Process
   send Chan{content, check1, check2} msg (Proc p) = Proc \env@Env{reduced} -> do
     putTMVarIO check1 ()
@@ -43,6 +35,14 @@ instance ExtendedChannel SyncChannel where
     atomically (orElse (takeTMVar (content chan1) <&> Left) (takeTMVar (content chan2) <&> Right)) >>= \case
       Left msg -> recvHelper (check2 chan1) p1 msg env
       Right msg -> recvHelper (check2 chan2) p2 msg env
+
+new :: (SyncChannel a -> Process) -> Process 
+new p = Proc \env -> do
+  cont <- newEmptyTMVarIO
+  check1 <- newEmptyTMVarIO
+  check2 <- newEmptyTMVarIO
+  let Proc p' = p (Chan cont check1 check2)
+  p' env
 
 recvHelper :: TMVar () -> (a -> Process) -> a -> Environment -> IO ()
 recvHelper checkChan p msg env@Env{reduced} = do

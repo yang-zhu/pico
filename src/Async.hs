@@ -1,4 +1,4 @@
-module Async (AsyncChannel) where
+module Async (AsyncChannel, new) where
 
 import Data.Functor ((<&>))
 import Control.Concurrent.MVar (tryPutMVar)
@@ -11,12 +11,6 @@ import Utils (Queue, isEmpty, enqueue, dequeue)
 newtype AsyncChannel a = AsyncChan (TVar (Queue a))
 
 instance Channel AsyncChannel where
-  new :: (AsyncChannel a -> Process) -> Process
-  new p = Proc \env -> do
-    chan <- newTVarIO ([], [])
-    let Proc p' = p (AsyncChan chan)
-    p' env
-  
   send :: AsyncChannel a -> a -> Process -> Process
   send (AsyncChan chan) msg (Proc p) = Proc \env@Env{reduced} -> do
     atomically $ modifyTVar chan (enqueue msg)
@@ -43,6 +37,12 @@ modifyChan chan queue = do
       let (ele, queue') = dequeue queue
       writeTVar chan queue'
       return ele
+
+new :: (AsyncChannel a -> Process) -> Process
+new p = Proc \env -> do
+  chan <- newTVarIO ([], [])
+  let Proc p' = p (AsyncChan chan)
+  p' env
 
 recvHelper :: (a -> Process) -> a -> Environment -> IO ()
 recvHelper p msg env@Env{reduced} = do

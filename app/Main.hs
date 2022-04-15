@@ -3,6 +3,7 @@ module Main where
 import Control.Concurrent (threadDelay)
 import Process
 import Channel
+import PiQQ
 -- import PrivateMVar
 -- import GlobalMVar
 -- import PrivateTMVar
@@ -22,8 +23,10 @@ main = do
     --     choose x (\ch -> exec (putStrLn $ "message received on " ++ ch) stop)
     --             y (\ch -> exec (putStrLn $ "message received on " ++ ch) stop)
 
-    new \chan ->
-      asyncMultiSend chan 10 `par` asyncMultiRecv chan 5
+    -- new \chan ->
+    --   asyncMultiSend chan 10 `par` asyncMultiRecv chan 5
+
+    [pico| new x. x<z>. exec act1. 0 | x(y). exec act2 y.stop |]
   
   where
     z :: Int

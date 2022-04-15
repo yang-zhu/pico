@@ -1,4 +1,4 @@
-module PrivateTMVar (SyncChannel) where
+module PrivateTMVar (SyncChannel, new) where
 
 import Data.Functor ((<&>))
 import Control.Concurrent.MVar (tryPutMVar)
@@ -11,12 +11,6 @@ import Utils (putTMVarIO, takeTMVarIO)
 newtype SyncChannel a = Chan (TMVar (a, TMVar ()))
 
 instance Channel SyncChannel where
-  new :: (SyncChannel a -> Process) -> Process 
-  new p = Proc \env -> do
-    chan <- newEmptyTMVarIO
-    let Proc p' = p (Chan chan)
-    p' env
-
   send :: SyncChannel a -> a -> Process -> Process
   send (Chan chan) msg (Proc p) = Proc \env@Env{reduced} -> do
     checkChan <- newTMVarIO ()
@@ -37,6 +31,12 @@ instance ExtendedChannel SyncChannel where
     >>= \case
       Left (msg, checkChan) -> recvHelper checkChan p1 msg env
       Right (msg, checkChan) -> recvHelper checkChan p2 msg env
+
+new :: (SyncChannel a -> Process) -> Process 
+new p = Proc \env -> do
+  chan <- newEmptyTMVarIO
+  let Proc p' = p (Chan chan)
+  p' env
 
 recvHelper :: TMVar () -> (a -> Process) -> a -> Environment -> IO ()
 recvHelper checkChan p msg env@Env{reduced} = do
