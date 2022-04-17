@@ -1,8 +1,7 @@
-module GlobalTMVar (SyncChannel, new) where
+module GlobalTMVar (SyncChannel, new, chooseMulti) where
 
-import Data.Functor ((<&>))
 import Control.Concurrent.MVar (tryPutMVar)
-import Control.Concurrent.STM (TMVar, atomically, orElse, newEmptyTMVarIO, takeTMVar)
+import Control.Concurrent.STM (TMVar, STM, atomically, orElse, newEmptyTMVarIO, takeTMVar)
 import Process (Process(..), Environment(..))
 import Channel (ExtendedChannel(..), Channel(..))
 import Utils (putTMVarIO, takeTMVarIO)
@@ -32,7 +31,8 @@ instance Channel SyncChannel where
 instance ExtendedChannel SyncChannel where
   choose :: SyncChannel a -> (a -> Process) -> SyncChannel b -> (b -> Process) -> Process
   choose chan1 p1 chan2 p2 = Proc \env ->
-    atomically (orElse (takeTMVar (content chan1) <&> Left) (takeTMVar (content chan2) <&> Right)) >>= \case
+    atomically (orElse (Left <$> takeTMVar (content chan1)) (Right <$> takeTMVar (content chan2)))
+    >>= \case
       Left msg -> recvHelper (check2 chan1) p1 msg env
       Right msg -> recvHelper (check2 chan2) p2 msg env
 
@@ -50,3 +50,15 @@ recvHelper checkChan p msg env@Env{reduced} = do
   tryPutMVar reduced ()
   let Proc p' = p msg
   p' env
+
+chooseMulti :: forall a. [SyncChannel a] -> [a -> Process] -> Process
+chooseMulti [] _ = undefined
+chooseMulti chans ps = Proc \env -> do
+  (msg, chan, p) <- atomically $ foldl1 orElse (map go pairs)
+  recvHelper (check2 chan) p msg env
+  where
+    pairs :: [(SyncChannel a, a -> Process)]
+    pairs = zip chans ps
+
+    go :: (SyncChannel a, a -> Process) -> STM (a, SyncChannel a, a -> Process)
+    go (chan, p) = takeTMVar (content chan) >>= \msg -> return (msg, chan, p)

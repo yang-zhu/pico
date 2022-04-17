@@ -5,7 +5,7 @@ import Data.Either (fromRight)
 import Text.Megaparsec ((<|>), MonadParsec(try), many, sepBy1, Parsec, parse, errorBundlePretty, empty, eof, some)
 import Text.Megaparsec.Char (alphaNumChar, char, letterChar, space)
 import qualified Text.Megaparsec.Char.Lexer as CL
-import Language.Haskell.TH (mkName, unsafeCodeCoerce, varP, varE, appE, lamE, unboundVarE, Quote, Exp, ExpQ)
+import Language.Haskell.TH
 import Language.Haskell.TH.Quote (QuasiQuoter(..))
 import Language.Haskell.TH.Syntax (Lift(..))
 import Process (exec, inert, par, repl)
@@ -14,7 +14,7 @@ import Channel
 {-
   Grammar:
   Restriction ::= "new" Variable "." Restriction | Parallel
-  Parallel ::= Replication {"|" Replication}
+  Parallel ::= Choice {"|" Choice}
   Choice ::= Replication ["+" Replication]
   Replication ::= "!" InputOutput | InputOutput
   InputOutput ::= Variable "<" Variable ">" "." Replication
@@ -29,7 +29,7 @@ import Channel
 data ProcessTerm 
   = Restriction Variable ProcessTerm
   | Parallel ProcessTerm ProcessTerm
-  | Choice ProcessTerm ProcessTerm
+  | Choice [ProcessTerm]
   | Replication ProcessTerm
   | Input Variable Variable ProcessTerm
   | Output Variable Variable ProcessTerm
@@ -62,17 +62,18 @@ pProcessTerm :: Parser ProcessTerm
 pProcessTerm = space *> pRestriction <* eof
 
 pRestriction :: Parser ProcessTerm
-pRestriction = Restriction <$> (keyword "new" *> variable <* symbol ".") <*> pParallel
+pRestriction = Restriction <$> (keyword "new" *> variable <* symbol ".") <*> pRestriction
   <|> pParallel
 
 pParallel :: Parser ProcessTerm
-pParallel = foldr1 Parallel <$> sepBy1 pReplication (symbol "|")
+pParallel = foldr1 Parallel <$> sepBy1 pChoice (symbol "|")
 
 pChoice :: Parser ProcessTerm
 pChoice = do
-  term <- pReplication
-  Choice term <$> (symbol "+" *> pReplication)
-   <|> return term
+  terms <- sepBy1 pReplication (symbol "+")
+  case length terms of
+    1 -> return $ head terms
+    _ -> return $ Choice terms
 
 pReplication :: Parser ProcessTerm
 pReplication = Replication <$> (symbol "!" *> pInputOutput)
@@ -129,8 +130,10 @@ liftFunApplication v vs = foldl appE (varE (mkName v)) (map (varE . mkName) vs)
 instance Lift ProcessTerm where
   lift (Restriction v t) = [| $(unboundVarE (mkName "new")) $(lamE [varP (mkName v)] (lift t)) |]
   lift (Parallel t1 t2) = [| par $(lift t1) $(lift t2) |]
-  lift (Choice (Input chan1 msg1 t1) (Input chan2 msg2 t2)) = [| choose $(unboundVarE (mkName chan1)) $(lamE [varP (mkName msg1)] (lift t1)) $(unboundVarE (mkName chan2)) $(lamE [varP (mkName msg2)] (lift t2)) |]
-  lift (Replication t) = [| repl $(lift t) |]
+  lift (Choice ts) = [| chooseMulti $(chans) $(funs) |]
+    where
+      chans = listE [unboundVarE (mkName chan) | Input chan _ _ <- ts]
+      funs = listE [lamE [varP (mkName msg)] (lift t) | Input _ msg t <- ts]
   lift (Input chan msg t) = [| recv $(unboundVarE (mkName chan)) $(lamE [varP (mkName msg)] (lift t)) |]
   lift (Output chan msg t) = [| send $(unboundVarE (mkName chan)) $(unboundVarE (mkName msg)) $(lift t) |]
   lift (Exec (v:vs) t) = [| exec $(liftFunApplication v vs) $(lift t) |]

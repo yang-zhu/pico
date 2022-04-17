@@ -1,6 +1,6 @@
-module Async (AsyncChannel, new) where
+module Async (AsyncChannel, new, chooseMulti) where
 
-import Data.Functor ((<&>))
+import Control.Monad ((>=>) )
 import Control.Concurrent.MVar (tryPutMVar)
 import Control.Concurrent.STM (TVar, STM, atomically, retry, orElse, newTVarIO, readTVar, writeTVar, modifyTVar)
 import Process (Process(..), Environment(..))
@@ -18,19 +18,20 @@ instance Channel AsyncChannel where
     p env
   
   recv :: AsyncChannel a -> (a -> Process) -> Process
-  recv (AsyncChan chan) p = Proc \env -> do
-    msg <- atomically $ readTVar chan >>= modifyChan chan
+  recv chan p = Proc \env -> do
+    msg <- atomically $ takeMessage chan
     recvHelper p msg env
 
 instance ExtendedChannel AsyncChannel where
   choose :: AsyncChannel a -> (a -> Process) -> AsyncChannel b -> (b -> Process) -> Process
-  choose (AsyncChan chan1) p1 (AsyncChan chan2) p2 = Proc \env ->
-    atomically (orElse ((readTVar chan1 >>= modifyChan chan1) <&> Left) ((readTVar chan2 >>= modifyChan chan2) <&> Right)) >>= \case
+  choose chan1 p1 chan2 p2 = Proc \env ->
+    atomically (orElse (Left <$> takeMessage chan1) (Right <$> takeMessage chan2)) >>= \case
       Left msg -> recvHelper p1 msg env
       Right msg -> recvHelper p2 msg env
 
-modifyChan :: TVar (Queue a) -> Queue a -> STM a
-modifyChan chan queue = do
+takeMessage :: AsyncChannel a -> STM a
+takeMessage (AsyncChan chan) = do
+  queue <- readTVar chan
   if isEmpty queue
     then retry
     else do
@@ -49,3 +50,15 @@ recvHelper p msg env@Env{reduced} = do
   tryPutMVar reduced ()
   let Proc p' = p msg
   p' env
+
+chooseMulti :: forall a. [AsyncChannel a] -> [a -> Process] -> Process
+chooseMulti [] _ = undefined
+chooseMulti chans ps = Proc \env -> do
+  (msg, p) <- atomically $ foldl1 orElse (map go pairs)
+  recvHelper p msg env
+  where
+    pairs :: [(AsyncChannel a, a -> Process)]
+    pairs = zip chans ps
+
+    go :: (AsyncChannel a, a -> Process) -> STM (a, a -> Process)
+    go (chan, p) = takeMessage chan >>= \msg -> return (msg, p)

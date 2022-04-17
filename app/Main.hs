@@ -7,8 +7,8 @@ import PiQQ
 -- import PrivateMVar
 -- import GlobalMVar
 -- import PrivateTMVar
--- import GlobalTMVar
-import Async
+import GlobalTMVar
+-- import Async
 
 main :: IO ()
 main = do
@@ -26,21 +26,23 @@ main = do
     -- new \chan ->
     --   asyncMultiSend chan 10 `par` asyncMultiRecv chan 5
 
-    [pico| new x. x<z>. exec act1. 0 | x(y). exec act2 y.stop |]
+    [pico| new a. new b. new c. b<z>. exec act1.0 | c<z>. exec act1.0 | a(y). exec actA y.0 + b(y). exec actB y.0 + c(y). exec actC y.0 |]
   
   where
     z :: Int
     z = 5
     keepSendingMsgs chan msg = send chan msg (exec (act1 >> threadDelay 1000000) (keepSendingMsgs chan msg)) 
     act1 = putStrLn "message sent"
-    act2 y = putStrLn $ "message received: " ++ show y
+    actA y = putStrLn $ "message received on channel a: " ++ show y
+    actB y = putStrLn $ "message received on channel b: " ++ show y
+    actC y = putStrLn $ "message received on channel c: " ++ show y
     
-    asyncMultiSend :: AsyncChannel String -> Int -> Process
-    asyncMultiSend chan counter
-      | counter == 0 = inert
-      | otherwise = send chan (show counter) (exec (putStrLn $ show counter ++ " sent") (asyncMultiSend chan (counter-1)))
+    -- asyncMultiSend :: AsyncChannel String -> Int -> Process
+    -- asyncMultiSend chan counter
+    --   | counter == 0 = inert
+    --   | otherwise = send chan (show counter) (exec (putStrLn $ show counter ++ " sent") (asyncMultiSend chan (counter-1)))
 
-    asyncMultiRecv :: AsyncChannel String -> Int -> Process
-    asyncMultiRecv chan counter
-      | counter == 0 = inert
-      | otherwise = recv chan (\msg -> exec (putStrLn $ msg ++ " received") (asyncMultiRecv chan (counter-1)))
+    -- asyncMultiRecv :: AsyncChannel String -> Int -> Process
+    -- asyncMultiRecv chan counter
+    --   | counter == 0 = inert
+    --   | otherwise = recv chan (\msg -> exec (putStrLn $ msg ++ " received") (asyncMultiRecv chan (counter-1)))
