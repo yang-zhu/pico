@@ -2,38 +2,41 @@ module PiQQ (pico) where
 
 import Data.Void (Void)
 import Data.Either (fromRight)
-import Text.Megaparsec ((<|>), MonadParsec(try), many, sepBy1, Parsec, parse, errorBundlePretty, empty, eof, some)
+import Text.Megaparsec ((<|>), MonadParsec(try), many, sepBy1, sepBy, Parsec, parse, errorBundlePretty, empty, eof, some, satisfy)
 import Text.Megaparsec.Char (alphaNumChar, char, letterChar, space)
 import qualified Text.Megaparsec.Char.Lexer as CL
-import Language.Haskell.TH
+import Language.Haskell.TH (mkName, unsafeCodeCoerce, varP, tupP, varE, appE, lamE, condE, listE, unboundVarE, Quote, Exp, ExpQ, tupE)
 import Language.Haskell.TH.Quote (QuasiQuoter(..))
 import Language.Haskell.TH.Syntax (Lift(..))
+import Language.Haskell.Meta.Parse (parseExp)
 import Process (exec, inert, par, repl)
 import Channel
 
 {-
   Grammar:
-  Restriction ::= "new" Variable "." Restriction | Parallel
   Parallel ::= Choice {"|" Choice}
-  Choice ::= Replication ["+" Replication]
-  Replication ::= "!" InputOutput | InputOutput
-  InputOutput ::= Variable "<" Variable ">" "." Replication
-                | Variable "(" Variable ")" "." Replication
-                | Atom
-  Atom ::= "(" Replication ")" 
-         | "exec" Variable {Variable} "." InputOutput
+  Choice ::= Prefix {"+" Prefix}
+  Prefix ::= "exec" HaskellCode "." Prefix
+           | "!" Prefix
+           | "[" HaskellCode "]" Prefix
+           | "new" Variable "." Prefix
+           | Variable "<" (epsilon | HaskellCode {"," HaskellCode}) ">" "." Prefix
+           | Variable "(" Variable ")" "." Prefix
+           | Atom
+  Atom ::= "(" Replication ")"
          | Variable {Variable}
          | "0"
 -}
 
 data ProcessTerm 
-  = Restriction Variable ProcessTerm
-  | Parallel ProcessTerm ProcessTerm
+  = Parallel ProcessTerm ProcessTerm
   | Choice [ProcessTerm]
+  | Exec String ProcessTerm
   | Replication ProcessTerm
-  | Input Variable Variable ProcessTerm
-  | Output Variable Variable ProcessTerm
-  | Exec [Variable] ProcessTerm
+  | Match String ProcessTerm
+  | Restriction Variable ProcessTerm
+  | Input Variable [Variable] ProcessTerm
+  | Output Variable [String] ProcessTerm
   | FunApp Variable [Variable]
   | Inert
 
@@ -58,50 +61,53 @@ variable = lexeme $ (:) <$> letterChar <*> many identifierChar
     identifierChar :: Parser Char
     identifierChar = alphaNumChar <|> char '\''
 
-pProcessTerm :: Parser ProcessTerm
-pProcessTerm = space *> pRestriction <* eof
+haskell :: [Char] -> Parser String
+haskell symbols = some $ satisfy (not . (`elem` symbols))
 
-pRestriction :: Parser ProcessTerm
-pRestriction = Restriction <$> (keyword "new" *> variable <* symbol ".") <*> pRestriction
-  <|> pParallel
+pProcessTerm :: Parser ProcessTerm
+pProcessTerm = space *> pParallel <* eof
 
 pParallel :: Parser ProcessTerm
 pParallel = foldr1 Parallel <$> sepBy1 pChoice (symbol "|")
 
 pChoice :: Parser ProcessTerm
 pChoice = do
-  terms <- sepBy1 pReplication (symbol "+")
+  terms <- sepBy1 pPrefix (symbol "+")
   case length terms of
     1 -> return $ head terms
     _ -> return $ Choice terms
 
-pReplication :: Parser ProcessTerm
-pReplication = Replication <$> (symbol "!" *> pInputOutput)
-  <|> pInputOutput
+pPrefix :: Parser ProcessTerm
+pPrefix = pExec <|> pReplication <|> pMatch <|> pRestriction <|>  pInput <|> pOutput <|> pAtom
 
-pInputOutput ::Parser ProcessTerm
-pInputOutput = pInput <|> pOutput <|> pAtom
+pExec :: Parser ProcessTerm
+pExec = Exec <$> (keyword "exec" *> haskell "." <* symbol ".") <*> pPrefix
+
+pReplication :: Parser ProcessTerm
+pReplication = Replication <$> (symbol "!" *> pPrefix)
+
+pMatch :: Parser ProcessTerm
+pMatch = Match <$> (symbol "[" *> haskell "]" <* symbol "]") <*> pPrefix
+
+pRestriction :: Parser ProcessTerm
+pRestriction = Restriction <$> (keyword "new" *> variable <* symbol ".") <*> pPrefix
 
 pInput :: Parser ProcessTerm
 pInput = Input
   <$> try (variable <* symbol "(")
-  <*> (variable <* symbol ")" <* symbol ".")
-  <*> pReplication
+  <*> (sepBy variable (symbol ",") <* symbol ")" <* symbol ".")
+  <*> pPrefix
 
 pOutput :: Parser ProcessTerm
 pOutput = Output
   <$> try (variable <* symbol "<")
-  <*> (variable <* symbol ">" <* symbol ".")
-  <*> pReplication
+  <*> (sepBy (haskell ",>") (symbol ",") <* symbol ">" <* symbol ".")
+  <*> pPrefix
 
 pAtom :: Parser ProcessTerm
-pAtom = (symbol "(" *> pReplication <* symbol ")")
-  <|> pExec
+pAtom = (symbol "(" *> pParallel <* symbol ")")
   <|> pFunApp
   <|> pInert
-
-pExec :: Parser ProcessTerm
-pExec = Exec <$> (keyword "exec" *> some variable <* symbol ".") <*> pInputOutput
 
 pFunApp :: Parser ProcessTerm
 pFunApp = FunApp <$> variable <*> many variable
@@ -111,11 +117,12 @@ pInert = symbol "0" >> return Inert
 
 
 pico :: QuasiQuoter
-pico = QuasiQuoter { quoteExp = compile
-                 , quotePat  = notHandled "patterns"
-                 , quoteType = notHandled "types"
-                 , quoteDec  = notHandled "declarations"
-                 }
+pico = QuasiQuoter
+  { quoteExp = compile
+  , quotePat  = notHandled "patterns"
+  , quoteType = notHandled "types"
+  , quoteDec  = notHandled "declarations"
+  }
   where
     notHandled things = error $ things ++ " not handled by pico quasiquoter."
 
@@ -124,21 +131,27 @@ pico = QuasiQuoter { quoteExp = compile
       Left e -> error $ errorBundlePretty e
       Right ast -> lift ast 
 
+haskellStrToExp :: Quote m => String -> m Exp
+haskellStrToExp s = case parseExp s of
+  Left err -> error err
+  Right arg' -> pure arg'
+
 liftFunApplication :: Quote m => Variable -> [Variable] -> m Exp
-liftFunApplication v vs = foldl appE (varE (mkName v)) (map (varE . mkName) vs)
+liftFunApplication fun args = foldl appE (varE (mkName fun)) (map haskellStrToExp args)
 
 instance Lift ProcessTerm where
-  lift (Restriction v t) = [| $(unboundVarE (mkName "new")) $(lamE [varP (mkName v)] (lift t)) |]
   lift (Parallel t1 t2) = [| par $(lift t1) $(lift t2) |]
   lift (Choice ts) = [| chooseMulti $(chans) $(funs) |]
     where
       chans = listE [unboundVarE (mkName chan) | Input chan _ _ <- ts]
-      funs = listE [lamE [varP (mkName msg)] (lift t) | Input _ msg t <- ts]
-  lift (Input chan msg t) = [| recv $(unboundVarE (mkName chan)) $(lamE [varP (mkName msg)] (lift t)) |]
-  lift (Output chan msg t) = [| send $(unboundVarE (mkName chan)) $(unboundVarE (mkName msg)) $(lift t) |]
-  lift (Exec (v:vs) t) = [| exec $(liftFunApplication v vs) $(lift t) |]
+      funs = listE [lamE [tupP $ map (varP . mkName) vars] (lift t) | Input _ vars t <- ts]
+  lift (Exec expr t) = [| exec $(haskellStrToExp expr) $(lift t) |]
+  lift (Replication t) = [| repl $(lift t) |]
+  lift (Match cond t) = [| if $(haskellStrToExp cond) then $(lift t) else inert |]
+  lift (Restriction v t) = [| $(unboundVarE (mkName "new")) $(lamE [varP (mkName v)] (lift t)) |]
+  lift (Input chan vars t) = [| recv $(unboundVarE (mkName chan)) $(lamE [tupP $ map (varP . mkName) vars] (lift t)) |]
+  lift (Output chan args t) = [| send $(unboundVarE (mkName chan)) $(tupE $ map haskellStrToExp args) $(lift t) |]
   lift (FunApp v vs) = liftFunApplication v vs
   lift Inert = [| inert |]
-  lift _ = error "invalid input"
   
   liftTyped = unsafeCodeCoerce . lift

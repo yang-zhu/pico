@@ -48,6 +48,7 @@ library
       ScopedTypeVariables
   build-depends:
       base >=4.7 && <5
+    , haskell-src-meta
     , megaparsec
     , stm
     , template-haskell
@@ -70,6 +71,7 @@ executable pico-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , haskell-src-meta
     , megaparsec
     , pico
     , stm
@@ -94,6 +96,7 @@ test-suite pico-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , haskell-src-meta
     , megaparsec
     , pico
     , stm

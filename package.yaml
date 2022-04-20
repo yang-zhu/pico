@@ -24,6 +24,7 @@ dependencies:
 - stm
 - megaparsec
 - template-haskell
+- haskell-src-meta
 
 library:
   source-dirs: src
