@@ -11,19 +11,19 @@ import Utils (Queue, isEmpty, enqueue, dequeue)
 newtype AsyncChannel a = AsyncChan (TVar (Queue a))
 
 instance Channel AsyncChannel where
-  send :: AsyncChannel a -> a -> Process -> Process
+  send :: AsyncChannel a -> a -> Process b -> Process b
   send (AsyncChan chan) msg (Proc p) = Proc \env@Env{reduced} -> do
     atomically $ modifyTVar chan (enqueue msg)
     tryPutMVar reduced ()
     p env
   
-  recv :: AsyncChannel a -> (a -> Process) -> Process
+  recv :: AsyncChannel a -> (a -> Process b) -> Process b
   recv chan p = Proc \env -> do
     msg <- atomically $ takeMessage chan
     recvHelper p msg env
 
 instance ExtendedChannel AsyncChannel where
-  choose :: AsyncChannel a -> (a -> Process) -> AsyncChannel b -> (b -> Process) -> Process
+  choose :: AsyncChannel a -> (a -> Process c) -> AsyncChannel b -> (b -> Process c) -> Process c
   choose chan1 p1 chan2 p2 = Proc \env ->
     atomically (orElse (Left <$> takeMessage chan1) (Right <$> takeMessage chan2)) >>= \case
       Left msg -> recvHelper p1 msg env
@@ -39,26 +39,26 @@ takeMessage (AsyncChan chan) = do
       writeTVar chan queue'
       return ele
 
-new :: (AsyncChannel a -> Process) -> Process
+new :: (AsyncChannel a -> Process b) -> Process b
 new p = Proc \env -> do
   chan <- newTVarIO ([], [])
   let Proc p' = p (AsyncChan chan)
   p' env
 
-recvHelper :: (a -> Process) -> a -> Environment -> IO ()
+recvHelper :: (a -> Process b) -> a -> Environment b -> IO ()
 recvHelper p msg env@Env{reduced} = do
   tryPutMVar reduced ()
   let Proc p' = p msg
   p' env
 
-chooseMulti :: forall a. [AsyncChannel a] -> [a -> Process] -> Process
+chooseMulti :: forall a b. [AsyncChannel a] -> [a -> Process b] -> Process b
 chooseMulti [] _ = undefined
 chooseMulti chans ps = Proc \env -> do
   (msg, p) <- atomically $ foldl1 orElse (map go pairs)
   recvHelper p msg env
   where
-    pairs :: [(AsyncChannel a, a -> Process)]
+    pairs :: [(AsyncChannel a, a -> Process b)]
     pairs = zip chans ps
 
-    go :: (AsyncChannel a, a -> Process) -> STM (a, a -> Process)
+    go :: (AsyncChannel a, a -> Process b) -> STM (a, a -> Process b)
     go (chan, p) = takeMessage chan >>= \msg -> return (msg, p)

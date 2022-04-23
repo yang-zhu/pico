@@ -11,13 +11,36 @@ import PrivateMVar
 -- import Async
 
 main :: IO ()
-main = runProcess
-  [pico| new x. (x<a+b>. exec act1. 0 | x(y). exec (putStrLn $ "message received: " ++ show y). 0) |]
-  where
-    act1= putStrLn "message sent"
-    act2 x = putStrLn $ "message received: " ++ show x
-    a = 3
-    b = 7
+main = runProcess $
+  new \sortedList -> new \quicksort ->
+    (send quicksort ([3,9,5,1,7], sortedList) inert) `par`
+    (recv sortedList \l -> exec (putStrLn $ "sorted list: " ++ show l) (stop ())) `par`
+    (repl $ recv quicksort \(l, res) -> case l of
+      [] -> send res [] inert
+      [x] -> send res [x] inert
+      (x:xs) ->
+        new \res1 -> new \res2 ->
+          let (less, greater) = partition (<x) xs
+          in send quicksort (less, res1) $ 
+              send quicksort (greater, res2) $
+                recv res1 \l1 ->
+                  recv res2 \l2 ->
+                    send res (l1 ++ (x:l2)) inert
+    )
+    where
+      partition :: Ord a => (a -> Bool) -> [a] -> ([a], [a])
+      partition _ [] = ([], [])
+      partition pred (x:xs)
+        | pred x = (x:r1, r2)
+        | otherwise = (r1, x:r2)
+        where
+          (r1, r2) = partition pred xs
+  -- [pico| new x. (x<a+b>. exec act1. 0 | x(y). exec (putStrLn $ "message received: " ++ show y). 0) |]
+  -- where
+  --   act1= putStrLn "message sent"
+  --   act2 x = putStrLn $ "message received: " ++ show x
+  --   a = 3
+  --   b = 7
 --   runProcess $
 --     -- new $ \chan ->
 --       -- keepSendingMsgs chan z `par` (repl $ recv chan (\y -> exec (act2 y) inert))

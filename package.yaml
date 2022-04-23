@@ -25,6 +25,7 @@ dependencies:
 - megaparsec
 - template-haskell
 - haskell-src-meta
+- hspec
 
 library:
   source-dirs: src

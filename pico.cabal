@@ -26,6 +26,7 @@ library
   exposed-modules:
       Async
       Channel
+      Examples
       GlobalMVar
       GlobalTMVar
       Lexer
@@ -49,6 +50,7 @@ library
   build-depends:
       base >=4.7 && <5
     , haskell-src-meta
+    , hspec
     , megaparsec
     , stm
     , template-haskell
@@ -72,6 +74,7 @@ executable pico-exe
   build-depends:
       base >=4.7 && <5
     , haskell-src-meta
+    , hspec
     , megaparsec
     , pico
     , stm
@@ -97,6 +100,7 @@ test-suite pico-test
   build-depends:
       base >=4.7 && <5
     , haskell-src-meta
+    , hspec
     , megaparsec
     , pico
     , stm
