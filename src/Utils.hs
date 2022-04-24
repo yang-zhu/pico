@@ -1,6 +1,9 @@
 module Utils where
 
+import Control.Monad (forM_)
+import Control.Concurrent.MVar (tryPutMVar)
 import Control.Concurrent.STM (TMVar, atomically, putTMVar, takeTMVar)
+import Process (Environment(..))
 
 
 type Queue a = ([a], [a])
@@ -18,6 +21,9 @@ dequeue (enq, deq)
       in (head deq', ([], tail deq'))
   | otherwise = (head deq, (enq, tail deq))
 
+
+signalReduction :: Environment a -> IO ()
+signalReduction Env{reduced} = forM_ reduced (`tryPutMVar` ())
 
 putTMVarIO :: TMVar a -> a -> IO ()
 putTMVarIO = (atomically .) . putTMVar

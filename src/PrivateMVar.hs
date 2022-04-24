@@ -1,26 +1,28 @@
 module PrivateMVar (SyncChannel, new) where
 
+import Control.Monad (forM_)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar, tryPutMVar)
 import Process (Process(..), Environment(..))
 import Channel (Channel(..))
+import Utils (signalReduction) 
 
 
 newtype SyncChannel a = Chan (MVar (a, MVar ()))
 
 instance Channel SyncChannel where
   send :: SyncChannel a -> a -> Process b -> Process b
-  send (Chan chan) msg (Proc p) = Proc \env@Env{reduced} -> do
+  send (Chan chan) msg (Proc p) = Proc \env -> do
     checkChan <- newMVar ()
     putMVar chan (msg, checkChan)
     putMVar checkChan ()
-    tryPutMVar reduced ()
+    signalReduction env
     p env
 
   recv :: SyncChannel a -> (a -> Process b) -> Process b
-  recv (Chan chan) p = Proc \env@Env{reduced} -> do
+  recv (Chan chan) p = Proc \env -> do
     (msg, checkChan) <- takeMVar chan
     takeMVar checkChan
-    tryPutMVar reduced ()
+    signalReduction env
     let Proc p' = p msg
     p' env
 

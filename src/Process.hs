@@ -6,7 +6,7 @@ import Control.Concurrent.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar, 
 
 data Environment a = Env
   { stopVar :: MVar a
-  , reduced :: MVar ()
+  , reduced :: Maybe (MVar ())
   }
 newtype Process a = Proc (Environment a -> IO ())
 
@@ -14,8 +14,7 @@ newtype Process a = Proc (Environment a -> IO ())
 runProcess :: Process a -> IO a
 runProcess (Proc p) = do
   stop <- newEmptyMVar
-  reduced <- newEmptyMVar
-  forkIO $ p (Env stop reduced)
+  forkIO $ p (Env stop Nothing)
   takeMVar stop
 
 stop :: a -> Process a
@@ -32,7 +31,7 @@ repl :: Process a -> Process a
 repl (Proc p) = Proc \Env{stopVar} ->
   forever do
     pReduced <- newEmptyMVar
-    forkIO $ p (Env stopVar pReduced)
+    forkIO $ p (Env stopVar (Just pReduced))
     takeMVar pReduced
 
 -- process p is immediately replicated infinitely often

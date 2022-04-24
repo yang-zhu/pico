@@ -5,16 +5,16 @@ import Control.Concurrent.MVar (tryPutMVar)
 import Control.Concurrent.STM (TVar, STM, atomically, retry, orElse, newTVarIO, readTVar, writeTVar, modifyTVar)
 import Process (Process(..), Environment(..))
 import Channel (ExtendedChannel(..), Channel(..))
-import Utils (Queue, isEmpty, enqueue, dequeue)
+import Utils (Queue, isEmpty, enqueue, dequeue, signalReduction)
 
 
 newtype AsyncChannel a = AsyncChan (TVar (Queue a))
 
 instance Channel AsyncChannel where
   send :: AsyncChannel a -> a -> Process b -> Process b
-  send (AsyncChan chan) msg (Proc p) = Proc \env@Env{reduced} -> do
+  send (AsyncChan chan) msg (Proc p) = Proc \env -> do
     atomically $ modifyTVar chan (enqueue msg)
-    tryPutMVar reduced ()
+    signalReduction env
     p env
   
   recv :: AsyncChannel a -> (a -> Process b) -> Process b
@@ -46,8 +46,8 @@ new p = Proc \env -> do
   p' env
 
 recvHelper :: (a -> Process b) -> a -> Environment b -> IO ()
-recvHelper p msg env@Env{reduced} = do
-  tryPutMVar reduced ()
+recvHelper p msg env = do
+  signalReduction env
   let Proc p' = p msg
   p' env
 

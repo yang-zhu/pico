@@ -3,25 +3,26 @@ module GlobalMVar (SyncChannel, new) where
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar, tryPutMVar)
 import Process (Process(..), Environment(..))
 import Channel (Channel(..))
+import Utils (signalReduction)
 
 
 data SyncChannel a = Chan (MVar a) (MVar ()) (MVar ())
 
 instance Channel SyncChannel where
   send :: SyncChannel a -> a -> Process b -> Process b
-  send (Chan cont check1 check2) msg (Proc p) = Proc \env@Env{reduced} -> do
+  send (Chan cont check1 check2) msg (Proc p) = Proc \env -> do
     putMVar check1 ()
     putMVar cont msg
     takeMVar check2
     takeMVar check1
-    tryPutMVar reduced ()
+    signalReduction env
     p env
 
   recv :: SyncChannel a -> (a -> Process b) -> Process b
-  recv (Chan cont _ check2) p = Proc \env@Env{reduced} -> do
+  recv (Chan cont _ check2) p = Proc \env -> do
     msg <- takeMVar cont
     putMVar check2 ()
-    tryPutMVar reduced ()
+    signalReduction env
     let Proc p' = p msg
     p' env
 

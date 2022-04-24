@@ -4,18 +4,18 @@ import Control.Concurrent.MVar (tryPutMVar)
 import Control.Concurrent.STM (STM, TMVar, atomically, orElse, newEmptyTMVarIO, newTMVarIO, takeTMVar)
 import Process (Process(..), Environment(..))
 import Channel (ExtendedChannel(..), Channel(..))
-import Utils (putTMVarIO, takeTMVarIO)
+import Utils (signalReduction, putTMVarIO, takeTMVarIO)
 
 
 newtype SyncChannel a = Chan (TMVar (a, TMVar ()))
 
 instance Channel SyncChannel where
   send :: SyncChannel a -> a -> Process b -> Process b
-  send (Chan chan) msg (Proc p) = Proc \env@Env{reduced} -> do
+  send (Chan chan) msg (Proc p) = Proc \env -> do
     checkChan <- newTMVarIO ()
     putTMVarIO chan (msg, checkChan)
     putTMVarIO checkChan ()
-    tryPutMVar reduced ()
+    signalReduction env
     p env
 
   recv :: SyncChannel a -> (a -> Process b) -> Process b
@@ -38,9 +38,9 @@ new p = Proc \env -> do
   p' env
 
 recvHelper :: TMVar () -> (a -> Process b) -> a -> Environment b -> IO ()
-recvHelper checkChan p msg env@Env{reduced} = do
+recvHelper checkChan p msg env = do
   takeTMVarIO checkChan
-  tryPutMVar reduced ()
+  signalReduction env
   let Proc p' = p msg
   p' env
 
