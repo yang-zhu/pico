@@ -2,7 +2,7 @@ import Test.Hspec
 import Process
 import Channel
 import PiQQ
-import Examples (piFac, piFacRec, piCollatz, piCollatzRec, piHanoi, piHanoiRec, piFib, piFibRec, piQuicksort, piQuicksortRec)
+import Examples
 import PrivateMVar
 -- import GlobalMVar
 -- import PrivateTMVar
@@ -13,43 +13,43 @@ main :: IO ()
 main = hspec do
   describe "piFac" do
     it "computes the factorial of 20" do
-      runProcess piFac `shouldReturn` fac 20
+      runProcess (piFac 20) `shouldReturn` fac 20
 
   describe "piFacRec" do
     it "computes the factorial of 20" do
-      runProcess piFacRec `shouldReturn` fac 20
+      runProcess (piFacRec 20) `shouldReturn` fac 20
   
   describe "piCollatz" do
     it "computes how many steps it takes for number 989345275647 to reach 1" do
-      runProcess piCollatz `shouldReturn` collatz 989345275647
+      runProcess (piCollatz 989345275647) `shouldReturn` collatz 989345275647
 
   describe "piCollatzRec" do  
     it "computes how many steps it takes for number 989345275647 to reach 1" do
-      runProcess piCollatzRec `shouldReturn` collatz 989345275647
+      runProcess (piCollatzRec 989345275647) `shouldReturn` collatz 989345275647
   
   describe "piHanoi" do
     it "computes how many steps a hanoi game with 16 discs takes" do
-      runProcess piHanoi `shouldReturn` hanoi 16
+      runProcess (piHanoi 16) `shouldReturn` hanoi 16
     
   describe "piHanoiRec" do
     it "computes how many steps a hanoi game with 16 discs takes" do
-      runProcess piHanoiRec `shouldReturn` hanoi 16
+      runProcess (piHanoiRec 16) `shouldReturn` hanoi 16
   
   describe "piFib" do
     it "computes the fibonacci number of 15" do
-      runProcess piFib `shouldReturn` fib 15
+      runProcess (piFib 15) `shouldReturn` fib 15
     
   describe "piFibRec" do
     it "computes the fibonacci number of 15" do
-      runProcess piFibRec `shouldReturn` fib 15
+      runProcess (piFibRec 15) `shouldReturn` fib 15
   
-  describe "piQuicksort" do
+  describe "transmitList" do
+    it "transmit a list using channels" do
+      runProcess (transmitList l) `shouldReturn` l
+
+  describe "quicksortList" do
     it "sorts a list using the quicksort algorithm" do
-      runProcess (piQuicksort l) `shouldReturn` quicksort l
-    
-  describe "piQuicksortRec" do
-    it "sorts a list using the quicksort algorithm" do
-      runProcess (piQuicksortRec l) `shouldReturn` quicksort l
+      runProcess (quicksortList l) `shouldReturn` quicksort l
 
 
 l :: [Int]

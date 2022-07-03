@@ -23,7 +23,7 @@ dequeue (enq, deq)
 
 
 signalReduction :: Environment a -> IO ()
-signalReduction Env{reduced} = forM_ reduced (`tryPutMVar` ())
+signalReduction Env{reduced} = forM_ reduced (\mvar -> tryPutMVar mvar ())
 
 putTMVarIO :: TMVar a -> a -> IO ()
 putTMVarIO = (atomically .) . putTMVar

@@ -1,5 +1,6 @@
 module Examples where
 
+import Data.Maybe (isJust, fromJust)
 import Process
 import Channel
 import PiQQ
@@ -9,25 +10,25 @@ import PrivateMVar
 -- import GlobalTMVar
 -- import Async
 
-
--- faculty
-piFac :: Process Integer
-piFac =
-  [pico|
-    new finalRes. new fac.
-    ( fac<20, finalRes>.0
-    | finalRes(r). exec (putStrLn $ "fac(20) = " ++ show r). stop r
-    | ! fac(n, res). ( [n == 0] res<1>.0
-                     | [n > 0] new res'. fac<n-1, res'>. res'(r). res<n*r>.0
-                     )
-    )
-  |]
-
-piFacRec :: Process Integer
-piFacRec =
+-- factorial
+piFac :: Integer -> Process Integer
+piFac n =
   new \finalRes ->
-    rec 20 finalRes `par`
-    recv finalRes \r -> exec (putStrLn $ "fac(20) = " ++ show r) (stop r)
+    new \fac ->
+      send fac (n, finalRes) inert `par`
+      recv finalRes stop `par`
+      repl (recv fac \(n, res) ->
+        if n == 0
+          then send res 1 inert
+          else new \res' ->
+            send fac (n - 1, res') $ recv res' \r -> send res (n * r) inert)
+
+
+piFacRec :: Integer -> Process Integer
+piFacRec n =
+  new \finalRes ->
+    rec n finalRes `par`
+    recv finalRes stop
   where
     rec :: Channel c => Integer -> c Integer -> Process Integer
     rec n res
@@ -35,29 +36,44 @@ piFacRec =
       | otherwise = new \res' ->
           rec (n-1) res' `par`
           recv res' \r ->
-            send res (n*r) inert
+            send res (n * r) inert
 
 -- collatz
-piCollatz :: Process Integer
-piCollatz =
-  [pico|
-    new steps. new collatz.
-    ( collatz<989345275647, steps>.0
-    | steps(count). exec (putStrLn $ "steps: " ++ show count). stop count
-    | ! collatz(n, stepCount). ( [n == 1] stepCount<0>.0
-                               | [n /= 1] new sc. ( [even n] collatz<n `div` 2, sc>.0
-                                                  | [odd n] collatz<3 * n + 1, sc>.0
-                                                  | sc(c). stepCount<c+1>.0
-                                                  )
-                               )
-    )
-  |]
+-- piCollatz :: Process Integer
+-- piCollatz =
+--   [pico|
+--     new steps. new collatz.
+--     ( collatz<989345275647, steps>.0
+--     | steps(count). exec (putStrLn $ "steps: " ++ show count). stop count
+--     | ! collatz(n, stepCount). ( [n == 1] stepCount<0>.0
+--                                | [n /= 1] new sc. ( [even n] collatz<n `div` 2, sc>.0
+--                                                   | [odd n] collatz<3 * n + 1, sc>.0
+--                                                   | sc(c). stepCount<c+1>.0
+--                                                   )
+--                                )
+--     )
+--   |]
 
-piCollatzRec :: Process Integer
-piCollatzRec =
+piCollatz :: Integer -> Process Integer
+piCollatz n =
   new \steps ->
-    rec 989345275647 steps `par`
-    recv steps \count -> exec (putStrLn $ "steps: " ++ show count) (stop count)
+    new \collatz ->
+      send collatz (n, steps) inert `par`
+      recv steps stop `par`
+      repl (recv collatz \(n, stepCount) ->
+        if n== 1
+          then send stepCount 0 inert
+          else new \sc ->
+            (if even n
+              then send collatz (n `div` 2, sc) inert
+              else send collatz (3 * n + 1, sc) inert) `par`
+            recv sc (\c -> send stepCount (c + 1) inert))
+
+piCollatzRec :: Integer -> Process Integer
+piCollatzRec n =
+  new \steps ->
+    rec n steps `par`
+    recv steps stop
   where
     rec :: Channel c => Integer -> c Integer -> Process Integer
     rec n stepCount
@@ -67,23 +83,36 @@ piCollatzRec =
           recv sc \c -> send stepCount (c+1) inert
 
 -- hanoi
-piHanoi :: Process Integer
-piHanoi =
-  [pico|
-    new steps. new hanoi.
-    ( hanoi<16, steps>.0
-    | steps(count). exec (putStrLn $ "hanoi(16) = " ++ show count). (stop count)
-    | ! hanoi(n, stepCount). ( [n == 1] stepCount<1>.0
-                             | [n > 1] new sc. hanoi<n-1, sc>. hanoi<n-1, sc>. sc(c1). sc(c2). stepCount<c1+c2+1>.0
-                             )
-    )
-  |]
+-- piHanoi :: Process Integer
+-- piHanoi =
+--   [pico|
+--     new steps. new hanoi.
+--     ( hanoi<16, steps>.0
+--     | steps(count). exec (putStrLn $ "hanoi(16) = " ++ show count). (stop count)
+--     | ! hanoi(n, stepCount). ( [n == 1] stepCount<1>.0
+--                              | [n > 1] new sc. hanoi<n-1, sc>. hanoi<n-1, sc>. sc(c1). sc(c2). stepCount<c1+c2+1>.0
+--                              )
+--     )
+--   |]
 
-piHanoiRec :: Process Integer
-piHanoiRec =
+piHanoi :: Integer -> Process Integer
+piHanoi n =
   new \steps ->
-    rec 16 steps `par`
-    recv steps \count -> exec (putStrLn $ "hanoi(16) = " ++ show count) (stop count)
+    new \hanoi ->
+      send hanoi (n, steps) inert `par`
+      recv steps stop `par`
+      repl (recv hanoi \(n, stepCount) ->
+        if n == 1
+          then send stepCount 1 inert
+          else new \sc ->
+            send hanoi (n - 1, sc) (send hanoi (n -1, sc) (recv sc (\c1 ->
+              recv sc (\c2 -> send stepCount (c1 + c2 + 1) inert)))))
+
+piHanoiRec :: Int -> Process Integer
+piHanoiRec n =
+  new \steps ->
+    rec n steps `par`
+    recv steps stop
   where
     rec :: Channel c => Int -> c Integer -> Process Integer
     rec n stepCount
@@ -96,24 +125,27 @@ piHanoiRec =
               send stepCount (c1+c2+1) inert
 
 -- fibonacci
-piFib :: Process Integer
-piFib = 
-  [pico|
-    new finalRes. new fib.
-    ( fib<15, finalRes>.0
-    | finalRes(r). exec (putStrLn $ "fib(15) = " ++ show r). (stop r)
-    | ! fib(n, res). exec (print n). ( [n == 0] res<0>.0
-                     | [n == 1] res<1>.0 
-                     | [n > 1] new res'. fib<n-1, res'>. fib<n-2, res'>. res'(r1). res'(r2). res<r1+r2>.0
-                     )
-    )
-  |]
-
-piFibRec :: Process Integer
-piFibRec =
+piFib :: Integer -> Process Integer
+piFib n =
   new \finalRes ->
-    rec 15 finalRes `par`
-    recv finalRes \r -> exec (putStrLn $ "fib(15) = " ++ show r) (stop r)
+    new \fib ->
+      send fib (n, finalRes) inert `par`
+      recv finalRes stop `par`
+      repl (recv fib \(n, res) -> case n of
+        0 -> send res 0 inert
+        1 -> send res 1 inert
+        _ -> new \res' ->
+          send fib (n - 1, res')
+            (send fib (n - 2, res') $
+              recv res' \r1 ->
+                recv res' \r2 ->
+                  send res (r1 + r2) inert))
+
+piFibRec :: Integer -> Process Integer
+piFibRec n =
+  new \finalRes ->
+    rec n finalRes `par`
+    recv finalRes stop
   where
     rec :: Channel c => Integer -> c Integer -> Process Integer
     rec n res
@@ -126,49 +158,45 @@ piFibRec =
             recv res' \r2 ->
               send res (r1+r2) inert
 
+-- transmit lists on pi-calculus channels
+sendList :: Channel c => c (Maybe a) -> [a] -> Process b
+sendList chan = foldr (send chan . Just) (send chan Nothing inert)
+
+recvList :: Channel c => c (Maybe a) -> ([a] -> Process b) -> Process b
+recvList chan f = recv chan (\x -> if isJust x then recvList chan (\xs -> f (fromJust x : xs)) else f [])
+
+transmitList :: [a] -> Process [a]
+transmitList l = new \chan -> sendList chan l `par` recvList chan stop
+
 -- quicksort
-partition :: Ord a => (a -> Bool) -> [a] -> ([a], [a])
-partition _ [] = ([], [])
-partition pred (x:xs)
-  | pred x = (x:r1, r2)
-  | otherwise = (r1, x:r2)
-  where
-    (r1, r2) = partition pred xs
+piPartition :: (Channel c, Ord a) => a -> c (Maybe a) -> c (Maybe a) -> c (Maybe a) -> Process b
+piPartition pivot input less greater = recv input \case
+  Just x -> send (if x < pivot then less else greater) (Just x) (piPartition pivot input less greater)
+  Nothing -> send less Nothing $ send greater Nothing inert
 
-piQuicksort :: [Int] -> Process [Int]
-piQuicksort list =
-  new \sortedList -> new \quicksort ->
-    (send quicksort (list, sortedList) inert) `par`
-    (recv sortedList \l -> exec (putStrLn $ "sorted list: " ++ show l) (stop l)) `par`
-    (repl $ recv quicksort \(l, res) -> case l of
-      [] -> send res [] inert
-      [x] -> send res [x] inert
-      (x:xs) ->
-        new \res1 -> new \res2 ->
-          let (less, greater) = partition (<x) xs
-          in send quicksort (less, res1) $ 
-              send quicksort (greater, res2) $
-                recv res1 \l1 ->
-                  recv res2 \l2 ->
-                    send res (l1 ++ (x:l2)) inert
-    )
-
-piQuicksortRec :: [Int] -> Process [Int]
-piQuicksortRec list =
-  new \sortedList -> new \quicksort ->
-    rec list sortedList `par`
-    recv sortedList \l ->  exec (putStrLn $ "sorted list: " ++ show l) (stop l)
+piQuicksort :: Ord a => SyncChannel (Maybe a) -> SyncChannel (Maybe a) -> Process b
+piQuicksort input output =
+  new \less ->
+    new \greater ->
+      new \lessOutput ->
+        new \greaterOutput ->
+          recv input (\x ->
+            if isJust x
+              then piPartition (fromJust x) input less greater `par`
+                  piQuicksort less lessOutput `par`
+                  piQuicksort greater greaterOutput `par`
+                  (forwardOutput lessOutput $ send output x $ forwardOutput greaterOutput $ send output Nothing inert)
+              else send output Nothing inert)
   where
-    rec :: (Ord a, Channel c) => [a] -> c [a] -> Process [a]
-    rec l res = case l of
-      [] -> send res [] inert
-      [x] -> send res [x] inert
-      x:xs ->
-        new \res1 -> new \res2 ->
-          let (less, greater) = partition (<x) xs
-          in
-            rec less res1 `par`
-            rec greater res2 `par`
-            recv res1 \l1 ->
-              recv res2 \l2 ->
-                send res (l1 ++ (x:l2)) inert
+    forwardOutput chan p = recv chan (\x ->
+      if isJust x
+        then send output x (forwardOutput chan p)
+        else p)
+
+quicksortList :: Ord a => [a] -> Process [a]
+quicksortList l =
+  new \inputChan ->
+    new \outputChan ->
+      sendList inputChan l `par`
+      piQuicksort inputChan outputChan `par`
+      recvList outputChan stop
