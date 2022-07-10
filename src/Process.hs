@@ -3,10 +3,12 @@ module Process where
 import Control.Monad (forever)
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar, tryPutMVar)
+import Control.Concurrent.STM (TMVar)
 
 data Environment a = Env
   { stopVar :: MVar a
   , reduced :: Maybe (MVar ())
+  , belowSum :: Maybe (TMVar ())
   }
 newtype Process a = Proc (Environment a -> IO ())
 
@@ -14,7 +16,7 @@ newtype Process a = Proc (Environment a -> IO ())
 runProcess :: Process a -> IO a
 runProcess (Proc p) = do
   stop <- newEmptyMVar
-  forkIO $ p (Env stop Nothing)
+  forkIO $ p (Env stop Nothing Nothing)
   takeMVar stop
 
 stop :: a -> Process a
@@ -31,7 +33,7 @@ repl :: Process a -> Process a
 repl (Proc p) = Proc \Env{stopVar} ->
   forever do
     pReduced <- newEmptyMVar
-    forkIO $ p (Env stopVar (Just pReduced))
+    forkIO $ p (Env stopVar (Just pReduced) Nothing)
     takeMVar pReduced
 
 -- process p is immediately replicated infinitely often

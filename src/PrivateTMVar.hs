@@ -1,10 +1,14 @@
-module PrivateTMVar (SyncChannel, new, chooseMulti) where
+module PrivateTMVar (SyncChannel, new, choose) where
 
-import Control.Concurrent.MVar (tryPutMVar)
+import Control.Concurrent.MVar (tryPutMVar, newEmptyMVar, putMVar)
 import Control.Concurrent.STM (STM, TMVar, atomically, orElse, newEmptyTMVarIO, newTMVarIO, takeTMVar)
 import Process (Process(..), Environment(..))
-import Channel (ExtendedChannel(..), Channel(..))
+import Channel (Channel(..))
 import Utils (signalReduction, putTMVarIO, takeTMVarIO)
+import Control.Concurrent (forkIO)
+import Data.Maybe (isJust, fromJust)
+import Control.Monad (when)
+import Control.Concurrent.STM.TMVar (putTMVar)
 
 
 newtype SyncChannel a = Chan (TMVar (a, TMVar ()))
@@ -19,39 +23,24 @@ instance Channel SyncChannel where
     p env
 
   recv :: SyncChannel a -> (a -> Process b) -> Process b
-  recv (Chan chan) p = Proc \env -> do
-    (msg, checkChan) <- takeTMVarIO chan
-    recvHelper checkChan p msg env
-  
-instance ExtendedChannel SyncChannel where
-  choose :: SyncChannel a -> (a -> Process c) -> SyncChannel b -> (b -> Process c) -> Process c
-  choose (Chan chan1) p1 (Chan chan2) p2 = Proc \env ->
-    atomically (orElse (Left <$> takeTMVar chan1) (Right <$> takeTMVar chan2))
-    >>= \case
-      Left (msg, checkChan) -> recvHelper checkChan p1 msg env
-      Right (msg, checkChan) -> recvHelper checkChan p2 msg env
+  recv (Chan chan) p = Proc \env@Env{belowSum} -> do
+    msg <- atomically do
+      when (isJust belowSum) (putTMVar (fromJust belowSum) ())
+      (msg, checkChan) <- takeTMVar chan
+      takeTMVar checkChan
+      return msg
+    signalReduction env
+    let Proc p' = p msg
+    p' env{belowSum = Nothing}
 
-new :: (SyncChannel a -> Process b) -> Process b 
+new :: (SyncChannel a -> Process b) -> Process b
 new p = Proc \env -> do
   chan <- newEmptyTMVarIO
   let Proc p' = p (Chan chan)
   p' env
 
-recvHelper :: TMVar () -> (a -> Process b) -> a -> Environment b -> IO ()
-recvHelper checkChan p msg env = do
-  takeTMVarIO checkChan
-  signalReduction env
-  let Proc p' = p msg
-  p' env
-
-chooseMulti :: forall a b. [SyncChannel a] -> [a -> Process b] -> Process b
-chooseMulti [] _ = undefined
-chooseMulti chans ps = Proc \env -> do
-  ((msg, checkChan), p) <- atomically $ foldl1 orElse (map go pairs)
-  recvHelper checkChan p msg env
-  where
-    pairs :: [(SyncChannel a, a -> Process b)]
-    pairs = zip chans ps
-
-    go :: (SyncChannel a, a -> Process b) -> STM ((a, TMVar ()), a -> Process b)
-    go (Chan chan, p) = takeTMVar chan >>= \res -> return (res, p)
+choose :: Process a -> Process a -> Process a
+choose (Proc p1) (Proc p2) = Proc \env@Env{belowSum} -> do
+  progress <- maybe newEmptyTMVarIO return belowSum
+  forkIO $ p2 env{belowSum = Just progress}
+  p1 env{belowSum = Just progress}
