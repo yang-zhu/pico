@@ -2,7 +2,7 @@ module Process where
 
 import Control.Monad (forever)
 import Control.Concurrent (forkIO)
-import Control.Concurrent.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar, tryPutMVar)
+import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.STM (TMVar)
 
 data Environment a = Env

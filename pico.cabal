@@ -34,6 +34,7 @@ library
       PrivateMVar
       PrivateTMVar
       Process
+      Sum
       Utils
   other-modules:
       Paths_pico

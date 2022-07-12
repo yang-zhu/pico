@@ -1,64 +1,35 @@
-module Async (AsyncChannel, new, chooseMulti) where
+module Async (AsyncChannel, new) where
 
-import Control.Monad ((>=>) )
-import Control.Concurrent.MVar (tryPutMVar)
-import Control.Concurrent.STM (TVar, STM, atomically, retry, orElse, newTVarIO, readTVar, writeTVar, modifyTVar)
+import Data.Maybe (isJust, fromJust)
+import Control.Monad (when)
+import Control.Concurrent.STM (atomically, putTMVar)
+import Control.Concurrent.STM.TChan (TChan, writeTChan, readTChan, newTChanIO)
 import Process (Process(..), Environment(..))
-import Channel (ExtendedChannel(..), Channel(..))
-import Utils (Queue, isEmpty, enqueue, dequeue, signalReduction)
+import Sum (choose)
+import Channel (Channel(..))
+import Utils (signalReduction)
 
 
-newtype AsyncChannel a = AsyncChan (TVar (Queue a))
+newtype AsyncChannel a = AsyncChan (TChan a)
 
 instance Channel AsyncChannel where
   send :: AsyncChannel a -> a -> Process b -> Process b
   send (AsyncChan chan) msg (Proc p) = Proc \env -> do
-    atomically $ modifyTVar chan (enqueue msg)
+    atomically $ writeTChan chan msg
     signalReduction env
     p env
   
   recv :: AsyncChannel a -> (a -> Process b) -> Process b
-  recv chan p = Proc \env -> do
-    msg <- atomically $ takeMessage chan
-    recvHelper p msg env
-
-instance ExtendedChannel AsyncChannel where
-  choose :: AsyncChannel a -> (a -> Process c) -> AsyncChannel b -> (b -> Process c) -> Process c
-  choose chan1 p1 chan2 p2 = Proc \env ->
-    atomically (orElse (Left <$> takeMessage chan1) (Right <$> takeMessage chan2)) >>= \case
-      Left msg -> recvHelper p1 msg env
-      Right msg -> recvHelper p2 msg env
-
-takeMessage :: AsyncChannel a -> STM a
-takeMessage (AsyncChan chan) = do
-  queue <- readTVar chan
-  if isEmpty queue
-    then retry
-    else do
-      let (ele, queue') = dequeue queue
-      writeTVar chan queue'
-      return ele
+  recv (AsyncChan chan) p = Proc \env@Env{belowSum} -> do
+    msg <- atomically do
+      when (isJust belowSum) (putTMVar (fromJust belowSum) ())
+      readTChan chan
+    signalReduction env
+    let Proc p' = p msg
+    p' env{belowSum = Nothing}
 
 new :: (AsyncChannel a -> Process b) -> Process b
 new p = Proc \env -> do
-  chan <- newTVarIO ([], [])
+  chan <- newTChanIO
   let Proc p' = p (AsyncChan chan)
   p' env
-
-recvHelper :: (a -> Process b) -> a -> Environment b -> IO ()
-recvHelper p msg env = do
-  signalReduction env
-  let Proc p' = p msg
-  p' env
-
-chooseMulti :: forall a b. [AsyncChannel a] -> [a -> Process b] -> Process b
-chooseMulti [] _ = undefined
-chooseMulti chans ps = Proc \env -> do
-  (msg, p) <- atomically $ foldl1 orElse (map go pairs)
-  recvHelper p msg env
-  where
-    pairs :: [(AsyncChannel a, a -> Process b)]
-    pairs = zip chans ps
-
-    go :: (AsyncChannel a, a -> Process b) -> STM (a, a -> Process b)
-    go (chan, p) = takeMessage chan >>= \msg -> return (msg, p)

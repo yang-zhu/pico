@@ -1,14 +1,13 @@
-module PrivateTMVar (SyncChannel, new, choose) where
+module PrivateTMVar (SyncChannel, new) where
 
-import Control.Concurrent.MVar (tryPutMVar, newEmptyMVar, putMVar)
-import Control.Concurrent.STM (STM, TMVar, atomically, orElse, newEmptyTMVarIO, newTMVarIO, takeTMVar)
-import Process (Process(..), Environment(..))
-import Channel (Channel(..))
-import Utils (signalReduction, putTMVarIO, takeTMVarIO)
-import Control.Concurrent (forkIO)
 import Data.Maybe (isJust, fromJust)
 import Control.Monad (when)
-import Control.Concurrent.STM.TMVar (putTMVar)
+import Control.Concurrent (forkIO)
+import Control.Concurrent.STM (TMVar, atomically, newEmptyTMVarIO, newTMVarIO, takeTMVar, putTMVar)
+import Process (Process(..), Environment(..))
+import Sum (choose)
+import Channel (Channel(..))
+import Utils (signalReduction, putTMVarIO, takeTMVarIO)
 
 
 newtype SyncChannel a = Chan (TMVar (a, TMVar ()))
@@ -38,9 +37,3 @@ new p = Proc \env -> do
   chan <- newEmptyTMVarIO
   let Proc p' = p (Chan chan)
   p' env
-
-choose :: Process a -> Process a -> Process a
-choose (Proc p1) (Proc p2) = Proc \env@Env{belowSum} -> do
-  progress <- maybe newEmptyTMVarIO return belowSum
-  forkIO $ p2 env{belowSum = Just progress}
-  p1 env{belowSum = Just progress}

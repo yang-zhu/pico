@@ -3,7 +3,6 @@ module Examples where
 import Data.Maybe (isJust, fromJust)
 import Process
 import Channel
-import PiQQ
 import PrivateMVar
 -- import GlobalMVar
 -- import PrivateTMVar
@@ -23,7 +22,6 @@ piFac n =
           else new \res' ->
             send fac (n - 1, res') $ recv res' \r -> send res (n * r) inert)
 
-
 piFacRec :: Integer -> Process Integer
 piFacRec n =
   new \finalRes ->
@@ -39,21 +37,6 @@ piFacRec n =
             send res (n * r) inert
 
 -- collatz
--- piCollatz :: Process Integer
--- piCollatz =
---   [pico|
---     new steps. new collatz.
---     ( collatz<989345275647, steps>.0
---     | steps(count). exec (putStrLn $ "steps: " ++ show count). stop count
---     | ! collatz(n, stepCount). ( [n == 1] stepCount<0>.0
---                                | [n /= 1] new sc. ( [even n] collatz<n `div` 2, sc>.0
---                                                   | [odd n] collatz<3 * n + 1, sc>.0
---                                                   | sc(c). stepCount<c+1>.0
---                                                   )
---                                )
---     )
---   |]
-
 piCollatz :: Integer -> Process Integer
 piCollatz n =
   new \steps ->
@@ -82,19 +65,7 @@ piCollatzRec n =
           (if even n then rec (n `div` 2) sc else rec (3*n+1) sc) `par`
           recv sc \c -> send stepCount (c+1) inert
 
--- hanoi
--- piHanoi :: Process Integer
--- piHanoi =
---   [pico|
---     new steps. new hanoi.
---     ( hanoi<16, steps>.0
---     | steps(count). exec (putStrLn $ "hanoi(16) = " ++ show count). (stop count)
---     | ! hanoi(n, stepCount). ( [n == 1] stepCount<1>.0
---                              | [n > 1] new sc. hanoi<n-1, sc>. hanoi<n-1, sc>. sc(c1). sc(c2). stepCount<c1+c2+1>.0
---                              )
---     )
---   |]
-
+-- Hanoi
 piHanoi :: Integer -> Process Integer
 piHanoi n =
   new \steps ->

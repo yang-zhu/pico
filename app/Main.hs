@@ -1,17 +1,24 @@
 module Main where
 
-import Control.Concurrent (threadDelay)
 import Process
+import Sum
 import Channel
-import PiQQ
-import PrivateMVar
-import Examples (transmitList)
+-- import PrivateMVar
 -- import GlobalMVar
--- import PrivateTMVar
+import PrivateTMVar
 -- import GlobalTMVar
 -- import Async
+import Examples (transmitList)
+
 
 main :: IO ()
 main = do
-  l <- runProcess $ transmitList [1..1000000]
-  print $ length l
+  -- l <- runProcess $ transmitList [1..1000000]
+  -- print $ length l
+  runProcess $ new \chan ->
+    send chan sent (exec (putStrLn ("sent: " ++ show sent)) inert) `par` 
+    choose
+      (recv chan (\received -> exec (putStrLn ("received + 1: " ++ show (received + 1))) (stop ())))
+      (recv chan (\received -> exec (putStrLn ("received + 2: " ++ show (received + 2))) (stop ())))
+  where
+    sent = 1
