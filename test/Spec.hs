@@ -1,7 +1,6 @@
 import Test.Hspec
 import Process
 import Channel
-import PiQQ
 import Examples
 import PrivateMVar
 -- import GlobalMVar

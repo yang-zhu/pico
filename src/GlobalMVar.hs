@@ -1,9 +1,9 @@
 module GlobalMVar (SyncChannel, new) where
 
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar, tryPutMVar)
-import Process (Process(..), Environment(..))
+import Process (Process(..))
 import Channel (Channel(..))
-import Utils (signalReduction, delayIfRandom)
+import Utils (signalReduction, throwIfBelowSum, delayIfRandom)
 
 
 data SyncChannel a = Chan (MVar a) (MVar ()) (MVar ())
@@ -11,6 +11,7 @@ data SyncChannel a = Chan (MVar a) (MVar ()) (MVar ())
 instance Channel SyncChannel where
   send :: SyncChannel a -> a -> Process b -> Process b
   send (Chan cont check1 check2) msg (Proc p) = Proc \env -> do
+    throwIfBelowSum env
     delayIfRandom env
     putMVar check1 ()
     putMVar cont msg
@@ -30,6 +31,7 @@ instance Channel SyncChannel where
 
 new :: (SyncChannel a -> Process b) -> Process b 
 new p = Proc \env -> do
+  throwIfBelowSum env
   cont <- newEmptyMVar
   check1 <- newEmptyMVar
   check2 <- newEmptyMVar

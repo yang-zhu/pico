@@ -5,10 +5,11 @@ import Control.Monad (when)
 import System.Random (randomRIO)
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM (TMVar, STM, atomically, newEmptyTMVarIO, takeTMVar, putTMVar)
-import Process (Process(..), Environment(..))
+import Environment (Environment(..))
+import Process (Process(..))
 import Sum (choose)
 import Channel (Channel(..))
-import Utils (signalReduction, delayIfRandom, putTMVarIO, takeTMVarIO)
+import Utils (signalReduction, throwIfBelowSum, delayIfRandom, putTMVarIO, takeTMVarIO)
 
 
 data SyncChannel a = Chan
@@ -20,6 +21,7 @@ data SyncChannel a = Chan
 instance Channel SyncChannel where
   send :: SyncChannel a -> a -> Process b -> Process b
   send Chan{content, check1, check2} msg (Proc p) = Proc \env -> do
+    throwIfBelowSum env
     delayIfRandom env
     putTMVarIO check1 ()
     putTMVarIO content msg
@@ -42,6 +44,7 @@ instance Channel SyncChannel where
 
 new :: (SyncChannel a -> Process b) -> Process b 
 new p = Proc \env -> do
+  throwIfBelowSum env
   cont <- newEmptyTMVarIO
   check1 <- newEmptyTMVarIO
   check2 <- newEmptyTMVarIO

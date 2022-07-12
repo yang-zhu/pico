@@ -2,9 +2,9 @@ module PrivateMVar (SyncChannel, new) where
 
 import Control.Monad (forM_)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar, tryPutMVar)
-import Process (Process(..), Environment(..))
+import Process (Process(..))
 import Channel (Channel(..))
-import Utils (signalReduction, delayIfRandom) 
+import Utils (signalReduction, throwIfBelowSum, delayIfRandom) 
 
 
 newtype SyncChannel a = Chan (MVar (a, MVar ()))
@@ -12,6 +12,7 @@ newtype SyncChannel a = Chan (MVar (a, MVar ()))
 instance Channel SyncChannel where
   send :: SyncChannel a -> a -> Process b -> Process b
   send (Chan chan) msg (Proc p) = Proc \env -> do
+    throwIfBelowSum env
     delayIfRandom env
     checkChan <- newMVar ()
     putMVar chan (msg, checkChan)
@@ -30,6 +31,7 @@ instance Channel SyncChannel where
 
 new :: (SyncChannel a -> Process b) -> Process b 
 new p = Proc \env -> do
+  throwIfBelowSum env
   chan <- newEmptyMVar
   let Proc p' = p (Chan chan)
   p' env

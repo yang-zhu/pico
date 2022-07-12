@@ -2,7 +2,8 @@ module Sum(choose) where
 
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM (newEmptyTMVarIO)
-import Process (Environment(..), Process(..))
+import Environment (Environment(..))
+import Process (Process(..))
 
 
 choose :: Process a -> Process a -> Process a

@@ -26,6 +26,7 @@ library
   exposed-modules:
       Async
       Channel
+      Environment
       Examples
       GlobalMVar
       GlobalTMVar

@@ -4,10 +4,11 @@ import Data.Maybe (isJust, fromJust)
 import Control.Monad (when)
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM (TMVar, atomically, newEmptyTMVarIO, newTMVarIO, takeTMVar, putTMVar)
-import Process (Process(..), Environment(..))
+import Environment (Environment(..))
+import Process (Process(..))
 import Sum (choose)
 import Channel (Channel(..))
-import Utils (signalReduction, delayIfRandom, putTMVarIO, takeTMVarIO)
+import Utils (signalReduction, throwIfBelowSum, delayIfRandom, putTMVarIO, takeTMVarIO)
 
 
 newtype SyncChannel a = Chan (TMVar (a, TMVar ()))
@@ -15,6 +16,7 @@ newtype SyncChannel a = Chan (TMVar (a, TMVar ()))
 instance Channel SyncChannel where
   send :: SyncChannel a -> a -> Process b -> Process b
   send (Chan chan) msg (Proc p) = Proc \env -> do
+    throwIfBelowSum env
     delayIfRandom env
     checkChan <- newTMVarIO ()
     putTMVarIO chan (msg, checkChan)
@@ -36,6 +38,7 @@ instance Channel SyncChannel where
 
 new :: (SyncChannel a -> Process b) -> Process b
 new p = Proc \env -> do
+  throwIfBelowSum env
   chan <- newEmptyTMVarIO
   let Proc p' = p (Chan chan)
   p' env
