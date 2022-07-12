@@ -9,6 +9,7 @@ data Environment a = Env
   { stopVar :: MVar a
   , reduced :: Maybe (MVar ())
   , belowSum :: Maybe (TMVar ())
+  , random :: Bool
   }
 newtype Process a = Proc (Environment a -> IO ())
 
@@ -16,7 +17,13 @@ newtype Process a = Proc (Environment a -> IO ())
 runProcess :: Process a -> IO a
 runProcess (Proc p) = do
   stop <- newEmptyMVar
-  forkIO $ p (Env stop Nothing Nothing)
+  forkIO $ p (Env stop Nothing Nothing False)
+  takeMVar stop
+
+runProcessRandom :: Process a -> IO a
+runProcessRandom (Proc p) = do
+  stop <- newEmptyMVar
+  forkIO $ p (Env stop Nothing Nothing True)
   takeMVar stop
 
 stop :: a -> Process a
@@ -30,10 +37,10 @@ par (Proc p) (Proc q) = Proc \env -> forkIO (q env) >> p env
 
 -- process p is only replicated when it has been reduced
 repl :: Process a -> Process a
-repl (Proc p) = Proc \Env{stopVar} ->
+repl (Proc p) = Proc \env ->
   forever do
     pReduced <- newEmptyMVar
-    forkIO $ p (Env stopVar (Just pReduced) Nothing)
+    forkIO $ p env{reduced = Just pReduced}
     takeMVar pReduced
 
 -- process p is immediately replicated infinitely often

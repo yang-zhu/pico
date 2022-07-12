@@ -30,7 +30,6 @@ library
       GlobalMVar
       GlobalTMVar
       Lexer
-      PiQQ
       PrivateMVar
       PrivateTMVar
       Process
@@ -50,11 +49,9 @@ library
       ScopedTypeVariables
   build-depends:
       base >=4.7 && <5
-    , haskell-src-meta
     , hspec
-    , megaparsec
+    , random
     , stm
-    , template-haskell
   default-language: Haskell2010
 
 executable pico-exe
@@ -74,12 +71,10 @@ executable pico-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , haskell-src-meta
     , hspec
-    , megaparsec
     , pico
+    , random
     , stm
-    , template-haskell
   default-language: Haskell2010
 
 test-suite pico-test
@@ -100,10 +95,8 @@ test-suite pico-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , haskell-src-meta
     , hspec
-    , megaparsec
     , pico
+    , random
     , stm
-    , template-haskell
   default-language: Haskell2010

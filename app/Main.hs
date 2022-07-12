@@ -15,7 +15,7 @@ main :: IO ()
 main = do
   -- l <- runProcess $ transmitList [1..1000000]
   -- print $ length l
-  runProcess $ new \chan ->
+  runProcessRandom $ new \chan ->
     send chan sent (exec (putStrLn ("sent: " ++ show sent)) inert) `par` 
     choose
       (recv chan (\received -> exec (putStrLn ("received + 1: " ++ show (received + 1))) (stop ())))

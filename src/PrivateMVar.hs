@@ -4,7 +4,7 @@ import Control.Monad (forM_)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar, tryPutMVar)
 import Process (Process(..), Environment(..))
 import Channel (Channel(..))
-import Utils (signalReduction) 
+import Utils (signalReduction, delayIfRandom) 
 
 
 newtype SyncChannel a = Chan (MVar (a, MVar ()))
@@ -12,6 +12,7 @@ newtype SyncChannel a = Chan (MVar (a, MVar ()))
 instance Channel SyncChannel where
   send :: SyncChannel a -> a -> Process b -> Process b
   send (Chan chan) msg (Proc p) = Proc \env -> do
+    delayIfRandom env
     checkChan <- newMVar ()
     putMVar chan (msg, checkChan)
     putMVar checkChan ()
@@ -20,6 +21,7 @@ instance Channel SyncChannel where
 
   recv :: SyncChannel a -> (a -> Process b) -> Process b
   recv (Chan chan) p = Proc \env -> do
+    delayIfRandom env
     (msg, checkChan) <- takeMVar chan
     takeMVar checkChan
     signalReduction env

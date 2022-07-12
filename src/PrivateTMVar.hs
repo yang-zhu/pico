@@ -7,7 +7,7 @@ import Control.Concurrent.STM (TMVar, atomically, newEmptyTMVarIO, newTMVarIO, t
 import Process (Process(..), Environment(..))
 import Sum (choose)
 import Channel (Channel(..))
-import Utils (signalReduction, putTMVarIO, takeTMVarIO)
+import Utils (signalReduction, delayIfRandom, putTMVarIO, takeTMVarIO)
 
 
 newtype SyncChannel a = Chan (TMVar (a, TMVar ()))
@@ -15,6 +15,7 @@ newtype SyncChannel a = Chan (TMVar (a, TMVar ()))
 instance Channel SyncChannel where
   send :: SyncChannel a -> a -> Process b -> Process b
   send (Chan chan) msg (Proc p) = Proc \env -> do
+    delayIfRandom env
     checkChan <- newTMVarIO ()
     putTMVarIO chan (msg, checkChan)
     putTMVarIO checkChan ()
@@ -23,6 +24,7 @@ instance Channel SyncChannel where
 
   recv :: SyncChannel a -> (a -> Process b) -> Process b
   recv (Chan chan) p = Proc \env@Env{belowSum} -> do
+    delayIfRandom env
     msg <- atomically do
       when (isJust belowSum) (putTMVar (fromJust belowSum) ())
       (msg, checkChan) <- takeTMVar chan
