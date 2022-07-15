@@ -26,7 +26,7 @@ instance Channel AsyncChannel where
     msg <- readChan chan
     signalReduction env
     let Proc p' = p msg
-    p' env{belowSum = Nothing}
+    p' env
 
 new :: (AsyncChannel a -> Process b) -> Process b
 new p = Proc \env -> do
