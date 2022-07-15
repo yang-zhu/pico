@@ -1,5 +1,7 @@
 module Main where
 
+import System.Environment (getArgs)
+import System.Clock (getTime, diffTimeSpec, toNanoSecs, Clock (Monotonic))
 import Process
 import Sum
 import Channel

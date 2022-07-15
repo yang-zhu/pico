@@ -22,6 +22,7 @@ instance Channel SyncChannel where
 
   recv :: SyncChannel a -> (a -> Process b) -> Process b
   recv (Chan cont _ check2) p = Proc \env -> do
+    throwIfBelowSum env
     delayIfRandom env
     msg <- takeMVar cont
     putMVar check2 ()
