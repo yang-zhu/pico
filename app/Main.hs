@@ -3,17 +3,18 @@ module Main where
 import System.Environment (getArgs)
 import System.Random (randomIO)
 import System.Clock (getTime, diffTimeSpec, toNanoSecs, Clock (Monotonic))
+import Control.Concurrent (threadDelay)
 import Process
 import Sum
 import Channel
 -- import PrivateMVar
 -- import GlobalMVar
-import PrivateTMVar
+-- import PrivateTMVar
 -- import GlobalTMVar
--- import Async
--- import GlobalTMVar
--- import Async
-import Examples (transmitList, quicksortList)
+-- import AsyncMVar
+-- import AsyncSTM
+-- import Examples (transmitList, quicksortList)
+import ExampleCML
 
 
 main :: IO ()
@@ -22,10 +23,12 @@ main = do
   let len = read listLen
   l <- generateList len
   before <- getTime Monotonic
-  -- runProcess $ transmitList l
-  runProcess $ quicksortList l
+  -- runProcess $ 
+  -- transmitList [1..len]
+  -- runProcess $
+  quicksortList l
   after <- getTime Monotonic
-  print (len, fromIntegral (toNanoSecs (diffTimeSpec before after)) / 1000000000)
+  print $ fromIntegral (toNanoSecs (diffTimeSpec before after)) / 1000000000
 
   where
     generateList :: Int -> IO [Int]

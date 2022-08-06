@@ -2,9 +2,9 @@ import Test.Hspec
 import Process
 import Channel
 import Examples
-import PrivateMVar
+-- import PrivateMVar
 -- import GlobalMVar
--- import PrivateTMVar
+import PrivateTMVar
 -- import GlobalTMVar
 -- import Async
 

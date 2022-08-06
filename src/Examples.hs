@@ -3,11 +3,12 @@ module Examples where
 import Data.Maybe (isJust, fromJust)
 import Process
 import Channel
-import PrivateMVar
+-- import PrivateMVar
 -- import GlobalMVar
 -- import PrivateTMVar
 -- import GlobalTMVar
--- import Async
+import AsyncMVar
+-- import AsyncSTM
 
 -- factorial
 piFac :: Integer -> Process Integer
@@ -133,8 +134,24 @@ piFibRec n =
 sendList :: Channel c => c (Maybe a) -> [a] -> Process b
 sendList chan = foldr (send chan . Just) (send chan Nothing inert)
 
+sendListRepl :: Channel c => c (Maybe a) -> [a] -> Process b
+sendListRepl chan l =
+  new \go ->
+    send go l inert `par`
+    repl (recv go \case
+      [] -> send chan Nothing inert
+      x:xs -> send chan (Just x) (send go xs inert))
+
 recvList :: Channel c => c (Maybe a) -> ([a] -> Process b) -> Process b
 recvList chan f = recv chan (\x -> if isJust x then recvList chan (\xs -> f (fromJust x : xs)) else f [])
+
+recvListRepl :: Channel c => c (Maybe a) -> ([a] -> Process b) -> Process b
+recvListRepl chan f =
+  new \go ->
+    send go f inert `par`
+    repl (recv go (\f -> recv chan \case
+      Just x -> send go (\xs -> f (x : xs)) inert
+      Nothing -> f []))
 
 transmitList :: [a] -> Process [a]
 transmitList l = new \chan -> sendList chan l `par` recvList chan stop
@@ -145,7 +162,7 @@ piPartition pivot input less greater = recv input \case
   Just x -> send (if x < pivot then less else greater) (Just x) (piPartition pivot input less greater)
   Nothing -> send less Nothing $ send greater Nothing inert
 
-piQuicksort :: Ord a => SyncChannel (Maybe a) -> SyncChannel (Maybe a) -> Process b
+-- piQuicksort :: Ord a => SyncChannel (Maybe a) -> SyncChannel (Maybe a) -> Process b
 piQuicksort input output =
   new \less ->
     new \greater ->
@@ -156,12 +173,12 @@ piQuicksort input output =
               then piPartition (fromJust x) input less greater `par`
                   piQuicksort less lessOutput `par`
                   piQuicksort greater greaterOutput `par`
-                  (forwardOutput lessOutput $ send output x $ forwardOutput greaterOutput $ send output Nothing inert)
+                  (forwardToOutput lessOutput $ send output x $ forwardToOutput greaterOutput $ send output Nothing inert)
               else send output Nothing inert)
   where
-    forwardOutput chan p = recv chan (\x ->
+    forwardToOutput chan p = recv chan (\x ->
       if isJust x
-        then send output x (forwardOutput chan p)
+        then send output x (forwardToOutput chan p)
         else p)
 
 quicksortList :: Ord a => [a] -> Process [a]

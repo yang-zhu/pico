@@ -26,8 +26,11 @@ library
   exposed-modules:
       AsyncMVar
       AsyncSTM
+      AsyncUnagi
       Channel
+      CML
       Environment
+      ExampleCML
       Examples
       GlobalMVar
       GlobalTMVar
@@ -71,7 +74,7 @@ executable pico-exe
       TemplateHaskell
       QuasiQuotes
       ScopedTypeVariables
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -eventlog
   build-depends:
       base >=4.7 && <5
     , clock
