@@ -5,7 +5,7 @@ import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.STM (TMVar)
 import Environment (Environment(..))
-import Utils (throwIfBelowSum)
+import Utils (throwIfBelowSum, signalReduction)
 
 
 newtype Process a = Proc (Environment a -> IO ())
@@ -44,6 +44,7 @@ repl (Proc p) = Proc \env -> do
     pReduced <- newEmptyMVar
     forkIO $ p env{reduced = Just pReduced}
     takeMVar pReduced
+    signalReduction env
 
 -- process p is immediately replicated infinitely often
 alwaysRepl :: Process a -> Process a

@@ -3,7 +3,6 @@ module Main where
 import System.Environment (getArgs)
 import System.Random (randomIO)
 import System.Clock (getTime, diffTimeSpec, toNanoSecs, Clock (Monotonic))
-import Control.Concurrent (threadDelay)
 import Process
 import Sum
 import Channel
@@ -24,9 +23,9 @@ main = do
   l <- generateList len
   before <- getTime Monotonic
   -- runProcess $ 
-  -- transmitList [1..len]
+  transmitList [1..len]
   -- runProcess $
-  quicksortList l
+  -- quicksortList l
   after <- getTime Monotonic
   print $ fromIntegral (toNanoSecs (diffTimeSpec before after)) / 1000000000
 

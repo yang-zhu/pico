@@ -3,11 +3,11 @@ module Examples where
 import Data.Maybe (isJust, fromJust)
 import Process
 import Channel
--- import PrivateMVar
+import PrivateMVar
 -- import GlobalMVar
 -- import PrivateTMVar
 -- import GlobalTMVar
-import AsyncMVar
+-- import AsyncMVar
 -- import AsyncSTM
 
 -- factorial
@@ -155,6 +155,17 @@ recvListRepl chan f =
 
 transmitList :: [a] -> Process [a]
 transmitList l = new \chan -> sendList chan l `par` recvList chan stop
+
+sendNOnes :: Channel c => Int -> c Int -> Process a
+sendNOnes 0 _ = inert
+sendNOnes n chan = send chan 1 (sendNOnes (n - 1) chan)
+
+recvNOnes :: Channel c => Int -> c Int ->([Int] -> Process b) -> Process b
+recvNOnes 0 _ f = f []
+recvNOnes n chan f = recv chan (\x -> recvNOnes (n - 1) chan (\xs -> f (x : xs)))
+
+transmitNOnes :: Int -> Process [Int]
+transmitNOnes n = new \chan -> sendNOnes n chan `par` recvNOnes n chan stop 
 
 -- quicksort
 piPartition :: (Channel c, Ord a) => a -> c (Maybe a) -> c (Maybe a) -> c (Maybe a) -> Process b
