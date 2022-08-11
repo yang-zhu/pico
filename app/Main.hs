@@ -12,20 +12,28 @@ import Channel
 -- import GlobalTMVar
 -- import AsyncMVar
 -- import AsyncSTM
--- import Examples (transmitList, quicksortList)
-import ExampleCML
+-- import PrivateMVar
+-- import GlobalMVar
+-- import PrivateTMVar
+-- import GlobalTMVar
+-- import AsyncMVar
+-- import AsyncSTM
+import Examples (transmitList, transmitNElems, transmitNElems', transmitMultiRecv, quicksortList)
+-- import ExampleCML
 
 
 main :: IO ()
 main = do
   [listLen] <- getArgs
   let len = read listLen
-  l <- generateList len
+  -- l <- generateList len
   before <- getTime Monotonic
-  -- runProcess $ 
-  transmitList [1..len]
-  -- runProcess $
-  -- quicksortList l
+  runProcess $
+    transmitList [1..len]
+    -- transmitNElems len
+    -- transmitNElems' len
+    -- transmitMultiRecv [1..len]
+    -- quicksortList l
   after <- getTime Monotonic
   print $ fromIntegral (toNanoSecs (diffTimeSpec before after)) / 1000000000
 

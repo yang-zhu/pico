@@ -25,6 +25,7 @@ dependencies:
 - random
 - hspec
 - clock
+- unagi-chan
 
 library:
   source-dirs: src

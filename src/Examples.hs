@@ -9,6 +9,7 @@ import PrivateMVar
 -- import GlobalTMVar
 -- import AsyncMVar
 -- import AsyncSTM
+-- import AsyncUnagi
 
 -- factorial
 piFac :: Integer -> Process Integer
@@ -154,18 +155,34 @@ recvListRepl chan f =
       Nothing -> f []))
 
 transmitList :: [a] -> Process [a]
-transmitList l = new \chan -> sendList chan l `par` recvList chan stop
+transmitList l = new \chan -> sendListRepl chan l `par` recvListRepl chan stop
 
-sendNOnes :: Channel c => Int -> c Int -> Process a
-sendNOnes 0 _ = inert
-sendNOnes n chan = send chan 1 (sendNOnes (n - 1) chan)
+-- transmit n-element lists on pi-calculus channels with one sender
+sendSeq :: Channel c => [a] -> c a -> Process b -> Process b
+sendSeq [] _ p = p
+sendSeq (x:xs) chan p = send chan x (sendSeq xs chan p)
 
-recvNOnes :: Channel c => Int -> c Int ->([Int] -> Process b) -> Process b
-recvNOnes 0 _ f = f []
-recvNOnes n chan f = recv chan (\x -> recvNOnes (n - 1) chan (\xs -> f (x : xs)))
+recvSeq :: Channel c => Int -> c a ->([a] -> Process b) -> Process b
+recvSeq 0 _ f = f []
+recvSeq n chan f = recv chan (\x -> recvSeq (n - 1) chan (\xs -> f (x : xs)))
 
-transmitNOnes :: Int -> Process [Int]
-transmitNOnes n = new \chan -> sendNOnes n chan `par` recvNOnes n chan stop 
+transmitNElems :: Int -> Process [Int]
+transmitNElems l = new \chan -> sendSeq [1..l] chan inert `par` recvSeq l chan stop
+
+-- transmit n-element lists on pi-calculus channels with many senders
+sendPar :: Channel c => [a] -> c a -> Process b
+sendPar [] _ = inert
+sendPar (x:xs) chan = send chan x inert `par` sendPar xs chan
+
+transmitNElems' :: Int -> Process [Int]
+transmitNElems' l = new \chan -> sendPar [1..l] chan `par` recvSeq l chan stop
+
+recvPar :: Channel c => Int -> c a -> Process b
+recvPar 0 _ = inert
+recvPar n chan = recv chan (\x -> inert) `par` recvPar (n - 1) chan
+
+transmitMultiRecv :: [a] -> Process ()
+transmitMultiRecv l = new \chan -> sendSeq l chan (stop ())`par` recvPar (length l) chan
 
 -- quicksort
 piPartition :: (Channel c, Ord a) => a -> c (Maybe a) -> c (Maybe a) -> c (Maybe a) -> Process b

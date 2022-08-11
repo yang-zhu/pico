@@ -40,11 +40,13 @@ par (Proc p) (Proc q) = Proc \env -> do
 repl :: Process a -> Process a
 repl (Proc p) = Proc \env -> do
   throwIfBelowSum env
-  forever do
-    pReduced <- newEmptyMVar
-    forkIO $ p env{reduced = Just pReduced}
-    takeMVar pReduced
-    signalReduction env
+  let loop = forever do
+        pReduced <- newEmptyMVar
+        forkIO $ p env{reduced = Just pReduced}
+        takeMVar pReduced
+        signalReduction env
+  forkIO loop 
+  loop
 
 -- process p is immediately replicated infinitely often
 alwaysRepl :: Process a -> Process a
