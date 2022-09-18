@@ -6,11 +6,11 @@ import Control.Concurrent.STM (atomically, putTMVar)
 import Control.Concurrent.STM.TChan (TChan, writeTChan, readTChan, newTChanIO)
 import Environment (Environment(..))
 import Process (Process(..))
-import Sum (choose)
 import Channel (Channel(..))
 import Utils (signalReduction, throwIfBelowSum, delayIfRandom)
 
 
+-- | An asynchronous pi-calculus channel.
 newtype AsyncChannel a = AsyncChan (TChan a)
 
 instance Channel AsyncChannel where
@@ -32,6 +32,7 @@ instance Channel AsyncChannel where
     let Proc p' = p msg
     p' env{belowSum = Nothing}
 
+-- | Create a new asynchronous channel and proceed to the execution of the given process.
 new :: (AsyncChannel a -> Process b) -> Process b
 new p = Proc \env -> do
   throwIfBelowSum env

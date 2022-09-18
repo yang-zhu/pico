@@ -7,8 +7,8 @@ import Channel (Channel(..))
 import Utils (signalReduction, throwIfBelowSum, delayIfRandom)
 
 
+-- | An asynchronous pi-calculus channel.
 newtype AsyncChannel a = AsyncChan (Chan a)
-
 
 instance Channel AsyncChannel where
   send :: AsyncChannel a -> a -> Process b -> Process b
@@ -28,6 +28,7 @@ instance Channel AsyncChannel where
     let Proc p' = p msg
     p' env
 
+-- | Create a new asynchronous channel and proceed to the execution of the given process.
 new :: (AsyncChannel a -> Process b) -> Process b
 new p = Proc \env -> do
   throwIfBelowSum env

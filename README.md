@@ -1,1 +1,4 @@
-# pico
+# Pico
+Pico is a Haskell library encoding the primitives of the π-calculus as combinators. The library is based on Concurrent Haskell and provides messages of arbitrary types, replication, input-guarded sums and asynchronous channels in addition to synchronous channels. On top of being usable to encode π-calculus processes, the library offers features to explore possible execution paths.
+
+The library is developed as part of my Bachelor thesis "The Implementation of the π-Calculus using Concurrent Haskell" under the supervision of Prof. Dr. David Sabel at Ludwig Maximilian University of Munich (LMU).

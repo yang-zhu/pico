@@ -1,31 +1,19 @@
 name:                pico
 version:             0.1.0.0
-github:              "githubuser/pico"
-license:             
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2022 Author name here"
+github:              "yang-zhu/pico"
+license:             BSD3
+author:              "Zhu Yang"
+copyright:           "2022 Zhu Yang"
 
 extra-source-files:
 - README.md
-- ChangeLog.md
 
-# Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
-
-# To avoid duplicated efforts in documentation and dealing with the
-# complications of embedding Haddock markup inside cabal files, it is
-# common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/pico#readme>
+description:         Please see the README on GitHub at <https://github.com/yang-zhu/pico#readme>
 
 dependencies:
 - base >= 4.7 && < 5
 - stm
 - random
-- hspec
-- clock
-- unagi-chan
 
 library:
   source-dirs: src
@@ -35,29 +23,4 @@ default-extensions:
 - LambdaCase
 - NamedFieldPuns
 - InstanceSigs
-- TemplateHaskell
-- QuasiQuotes
 - ScopedTypeVariables
-
-executables:
-  pico-exe:
-    main:                Main.hs
-    source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    - -eventlog
-    dependencies:
-    - pico
-
-tests:
-  pico-test:
-    main:                Spec.hs
-    source-dirs:         test
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - pico

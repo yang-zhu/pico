@@ -2,16 +2,14 @@ module GlobalTMVar (SyncChannel, new) where
 
 import Data.Maybe (isJust, fromJust)
 import Control.Monad (when)
-import System.Random (randomRIO)
-import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM (TMVar, STM, atomically, newEmptyTMVarIO, takeTMVar, putTMVar)
 import Environment (Environment(..))
 import Process (Process(..))
-import Sum (choose)
 import Channel (Channel(..))
 import Utils (signalReduction, throwIfBelowSum, delayIfRandom, putTMVarIO, takeTMVarIO)
 
 
+-- | A synchronous pi-calculus channel.
 data SyncChannel a = Chan
   { content :: TMVar a 
   , check1 :: TMVar ()
@@ -42,6 +40,7 @@ instance Channel SyncChannel where
     let Proc p' = p msg
     p' env{belowSum = Nothing}
 
+-- | Create a new synchronous channel and proceed to the execution of the given process.
 new :: (SyncChannel a -> Process b) -> Process b 
 new p = Proc \env -> do
   throwIfBelowSum env
