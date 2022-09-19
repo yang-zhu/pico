@@ -5,7 +5,7 @@ import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.STM (TMVar)
 import Environment (Environment(..))
-import Utils (throwIfBelowSum, signalReduction)
+import Utils (throwIfBelowSum, signalReduction, delayIfRandom)
 
 
 -- | A process of type 'Process a' represents a pi-calculus process that might terminate with a result of type 'a'. 
@@ -29,6 +29,7 @@ runProcessRandom (Proc p) = do
 stop :: a -> Process a
 stop res = Proc \env@Env{stopVar} -> do
   throwIfBelowSum env
+  delayIfRandom env
   putMVar stopVar res
 
 -- | The process that does nothing.
@@ -67,6 +68,7 @@ alwaysRepl (Proc p) = Proc \env -> do
 exec :: IO a -> (a -> Process b) -> Process b
 exec act p = Proc \env -> do
   throwIfBelowSum env
+  delayIfRandom env
   res <- act
   let Proc p' = p res
   p' env
@@ -76,5 +78,6 @@ exec act p = Proc \env -> do
 exec_ :: IO a -> Process b -> Process b
 exec_ act (Proc p) = Proc \env -> do
   throwIfBelowSum env
+  delayIfRandom env
   act
   p env
